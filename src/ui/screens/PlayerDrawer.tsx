@@ -147,8 +147,8 @@ export function PlayerProfile({ id }: { id: number }) {
 
         {tab === 'stats' && <div className="col" style={{ marginTop: 24, gap: 18 }}>
           <div className="grid g2">
-            <div className="card"><div className="card-head"><h3>Club form</h3><span className="muted right">{d.formLabel}</span></div>
-              <div className="row" style={{ alignItems: 'flex-end', height: 86, gap: 7 }}>{p.form.length ? p.form.map((f, i) => <div key={i} className="grow col center" style={{ gap: 4, justifyContent: 'flex-end', height: '100%' }}><div style={{ height: `${Math.max(8, (f - 4.5) * 17)}%`, borderRadius: 6, background: ratingColor(f) }} /><span className="num" style={{ fontSize: 12 }}>{f.toFixed(1)}</span></div>) : <span className="muted">No recent club matches.</span>}</div></div>
+            <div className="card"><div className="card-head"><h3>Recent form</h3><span className="muted right">{d.formLabel}</span></div>
+              <div className="row" style={{ alignItems: 'flex-end', height: 86, gap: 7 }}>{p.form.length ? p.form.map((f, i) => <div key={i} className="grow col center" style={{ gap: 4, justifyContent: 'flex-end', height: '100%' }}><div style={{ height: `${Math.max(8, (f - 4.5) * 17)}%`, borderRadius: 6, background: ratingColor(f) }} /><span className="num" style={{ fontSize: 12 }}>{f.toFixed(1)}</span></div>) : <span className="muted">No recent matches.</span>}</div></div>
             <div className="card"><div className="card-head"><h3>Market value</h3><span className="right num">{money(p.value)}</span></div><Spark pts={p.valueHist.map((x) => x[1])} color="#3ddc97" h={86} /></div>
           </div>
           <div className="card flush"><table className="t"><thead><tr><th>Season</th><th className="c">Apps</th><th className="c">Mins</th><th className="c">Goals</th><th className="c">Assists</th><th className="c">Clean sheets</th><th className="c">Yellows</th><th className="r">Rating</th></tr></thead><tbody>

@@ -175,7 +175,7 @@ export function Home() {
             {recent.length ? recent.map((f) => <ResultRow key={f.id} f={f} />) : <div className="faint">No matches played yet under your presidency.</div>}
           </div>
           <div className="card flush">
-            <div className="card-head"><h3>In form</h3><span className="faint">club matches, last five</span></div>
+            <div className="card-head"><h3>In form</h3><span className="faint">last five matches, club and country</span></div>
             <table className="t"><tbody>
               {inForm.map((p) => (
                 <tr key={p.id} className="click" onClick={() => link(`player:${p.id}`)}>

@@ -66,6 +66,9 @@ export interface Player {
   form: number[]
   /** Goals and assists in recent club matches, newest last (max 6). */
   recent?: [number, number][]
+  /** Net potential points gained through breakouts, and the day of the last revision. */
+  potUp?: number
+  potDay?: Day
   /** Day of the last form story about this player. */
   lastNews?: Day
   /** 0–100 physical freshness. */

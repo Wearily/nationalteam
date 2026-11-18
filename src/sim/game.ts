@@ -2,7 +2,7 @@ import { fmtDay, toDay, ymd, type Day } from './core/date'
 import { Rng, clamp } from './core/rng'
 import { A, fitToOverall, overallAt } from './ratings/attributes'
 import { mergeExtra, type RawData, type RawExtra } from './data/raw'
-import { developAll, revalue, seasonRollover } from './career/develop'
+import { developAll, revalue, reviewPotential, seasonRollover } from './career/develop'
 import { seasonYearFor, simClubFixture, startLeagueSeason } from './clubs/season'
 import { transferWeek } from './clubs/transfers'
 import { progress } from './comps/engine'
@@ -419,6 +419,8 @@ export class Game {
         if (level === 'senior') { p.caps++; p.goals += st.goals; if (competitive) p.capTied = true } else p.youthCaps[level] = (p.youthCaps[level] ?? 0) + 1
         p.cond = clamp(sim.energy[t][i] - 10 - (st.mins / 90) * 8, 30, 100)
         p.sharp = Math.min(100, p.sharp + (st.mins / 90) * 8)
+        // an international counts toward recent form like any other match (cameos of under 20 minutes do not)
+        if (st.mins >= 20) { p.form.push(st.rating); if (p.form.length > 8) p.form.shift() }
         if (p.nat[0] === 'IRN') { p.morale = clamp(p.morale + (st.rating - 6.6) * 4, 0, 100); p.known = Math.min(100, p.known + 10 + (st.mins / 90) * 20) }
       })
     }
@@ -653,6 +655,12 @@ export class Game {
     }
     if (d === 1) {
       developAll(w, this.rng, w.day)
+      for (const { player: pl, by } of reviewPotential(w, this.rng, w.day)) {
+        if (pl.nat[0] !== 'IRN' || pl.known < 60) continue
+        const club = pl.clubId != null ? w.clubs[pl.clubId].name : 'his club'
+        this.news('form', `${pl.name}'s run of form at ${club} has the scouts revising his ceiling upward (+${by} potential, now ${pl.pot}).`, pl.id)
+        if (pl.pot >= 78) this.msg('scout', `${pl.name} is developing faster than expected`, `After a sustained run of performances for ${club}, our assessment of ${pl.name} (${Math.floor((w.day - pl.dob) / 365.25)}, ${pl.pos[0]}) has gone up. His potential is now rated ${pl.pot}.`, false, `player:${pl.id}`)
+      }
       revalue(w, w.day)
       rerank(w)
       w.rankHist.push([w.day, w.nations.IRN.rank])

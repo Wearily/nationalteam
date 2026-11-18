@@ -17,7 +17,7 @@ export interface DynOvr {
 }
 
 /**
- * Dynamic overall: a player's rating moves with recent club ratings, morale, and match fitness
+ * Dynamic overall: a player's rating moves with his recent match ratings (club and international), morale, and match fitness
  * (sharpness from playing time plus current condition). The same deltas feed squad selection,
  * line-ups and the match engine, so an in-form 74 can genuinely outplay a rusty 77.
  */
