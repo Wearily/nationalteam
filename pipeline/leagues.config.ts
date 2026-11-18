@@ -1,0 +1,30 @@
+// Covered leagues. `titles` are tried in order (newest season first); the first existing page with a team list wins.
+export interface LeagueCfg { id: string; name: string; country: string; tier: number; strength: number; startMonth: number; titles: string[]; expect: number }
+const s = (base: string, cal = false) => cal ? [`2026 ${base}`, `2025 ${base}`] : [`2026–27 ${base}`, `2025–26 ${base}`]
+export const LEAGUES: LeagueCfg[] = [
+  { id: 'irn-1', name: 'Persian Gulf Pro League', country: 'IRN', tier: 1, strength: 58, startMonth: 8, titles: s('Persian Gulf Pro League'), expect: 18 },
+  { id: 'irn-2', name: 'Azadegan League', country: 'IRN', tier: 2, strength: 40, startMonth: 8, titles: s('Azadegan League'), expect: 16 },
+  { id: 'uae-1', name: 'UAE Pro League', country: 'UAE', tier: 1, strength: 62, startMonth: 8, titles: s('UAE Pro League'), expect: 14 },
+  { id: 'ksa-1', name: 'Saudi Pro League', country: 'KSA', tier: 1, strength: 72, startMonth: 8, titles: s('Saudi Pro League'), expect: 18 },
+  { id: 'qat-1', name: 'Qatar Stars League', country: 'QAT', tier: 1, strength: 62, startMonth: 8, titles: s('Qatar Stars League'), expect: 12 },
+  { id: 'irq-1', name: 'Iraq Stars League', country: 'IRQ', tier: 1, strength: 50, startMonth: 9, titles: s('Iraq Stars League'), expect: 20 },
+  { id: 'tur-1', name: 'Süper Lig', country: 'TUR', tier: 1, strength: 72, startMonth: 8, titles: s('Süper Lig'), expect: 18 },
+  { id: 'uzb-1', name: 'Uzbekistan Super League', country: 'UZB', tier: 1, strength: 52, startMonth: 3, titles: s('Uzbekistan Super League', true), expect: 16 },
+  { id: 'eng-1', name: 'Premier League', country: 'ENG', tier: 1, strength: 92, startMonth: 8, titles: s('Premier League'), expect: 20 },
+  { id: 'eng-2', name: 'EFL Championship', country: 'ENG', tier: 2, strength: 72, startMonth: 8, titles: s('EFL Championship'), expect: 24 },
+  { id: 'esp-1', name: 'La Liga', country: 'ESP', tier: 1, strength: 89, startMonth: 8, titles: s('La Liga'), expect: 20 },
+  { id: 'esp-2', name: 'Segunda División', country: 'ESP', tier: 2, strength: 68, startMonth: 8, titles: s('Segunda División'), expect: 22 },
+  { id: 'ger-1', name: 'Bundesliga', country: 'GER', tier: 1, strength: 87, startMonth: 8, titles: s('Bundesliga'), expect: 18 },
+  { id: 'ger-2', name: '2. Bundesliga', country: 'GER', tier: 2, strength: 68, startMonth: 8, titles: s('2. Bundesliga'), expect: 18 },
+  { id: 'ita-1', name: 'Serie A', country: 'ITA', tier: 1, strength: 87, startMonth: 8, titles: s('Serie A'), expect: 20 },
+  { id: 'fra-1', name: 'Ligue 1', country: 'FRA', tier: 1, strength: 83, startMonth: 8, titles: s('Ligue 1'), expect: 18 },
+  { id: 'ned-1', name: 'Eredivisie', country: 'NED', tier: 1, strength: 76, startMonth: 8, titles: s('Eredivisie'), expect: 18 },
+  { id: 'bel-1', name: 'Belgian Pro League', country: 'BEL', tier: 1, strength: 74, startMonth: 7, titles: s('Belgian Pro League'), expect: 18 },
+  { id: 'por-1', name: 'Primeira Liga', country: 'POR', tier: 1, strength: 77, startMonth: 8, titles: s('Primeira Liga'), expect: 18 },
+  { id: 'gre-1', name: 'Super League Greece', country: 'GRE', tier: 1, strength: 66, startMonth: 8, titles: s('Super League Greece'), expect: 14 },
+  { id: 'rus-1', name: 'Russian Premier League', country: 'RUS', tier: 1, strength: 70, startMonth: 7, titles: s('Russian Premier League'), expect: 16 },
+  { id: 'den-1', name: 'Danish Superliga', country: 'DEN', tier: 1, strength: 66, startMonth: 7, titles: s('Danish Superliga'), expect: 12 },
+  { id: 'swe-1', name: 'Allsvenskan', country: 'SWE', tier: 1, strength: 62, startMonth: 4, titles: s('Allsvenskan', true), expect: 16 },
+  { id: 'aut-1', name: 'Austrian Bundesliga', country: 'AUT', tier: 1, strength: 66, startMonth: 8, titles: s('Austrian Football Bundesliga'), expect: 12 },
+  { id: 'cro-1', name: 'HNL', country: 'CRO', tier: 1, strength: 62, startMonth: 8, titles: [...s('Croatian Football League'), ...s('HNL')], expect: 10 },
+]
