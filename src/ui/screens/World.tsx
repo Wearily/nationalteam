@@ -73,16 +73,35 @@ export function Transfers() {
   const top = useMemo(() => world.players.filter((p) => !p.retired && p.nat[0] === 'IRN').sort((a, b) => b.value - a.value).slice(0, 15), [world])
   return (
     <div className="page-inner">
+      <div className="card flush">
+        <div className="card-head"><h3>Recent moves</h3><span className="faint">Iranian players · windows open in January and July–August · free agents can sign at any time</span></div>
+        {moves.length ? (
+          <div className="scroll" style={{ maxHeight: 520 }}>
+            <table className="t fixed">
+              <colgroup><col style={{ width: 112 }} /><col /><col style={{ width: 62 }} /><col style={{ width: 52 }} /><col style={{ width: 86 }} /><col style={{ width: 80 }} /><col style={{ width: '20%' }} /><col style={{ width: '23%' }} /><col style={{ width: 96 }} /></colgroup>
+              <thead><tr><th>Date</th><th>Player</th><th>Pos</th><th className="c">Age</th><th className="c">Ovr</th><th className="c">Pot</th><th>From</th><th>To</th><th className="r">Fee</th></tr></thead>
+              <tbody>
+                {moves.map(({ p, t }, i) => (
+                  <tr key={i} className="click" onClick={() => link(`player:${p.id}`)}>
+                    <td className="faint num">{fmtDay(t.day)}</td>
+                    <td><PlayerLink p={p} /></td>
+                    <td><PosTag pos={p.pos[0]} /></td>
+                    <td className="c num">{ageOf(world, p)}</td>
+                    <td className="c"><Ovr p={p} /></td>
+                    <td className="c"><Ovr p={p} pot /></td>
+                    <td className="muted"><span className="row" style={{ gap: 7 }}>{t.from != null && <ClubBadge clubId={t.from} />}<span className="truncate">{t.from != null ? world.clubs[t.from].name : 'Free agent'}</span></span></td>
+                    <td><span className="row" style={{ gap: 7 }}>{t.to != null && <ClubBadge clubId={t.to} />}<span className="truncate">{t.to != null ? world.clubs[t.to].name : '–'}</span>{t.to != null && <Flag code={world.clubs[t.to].country} sm />}</span></td>
+                    <td className="r num">{t.fee ? money(t.fee) : 'Free'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : <Empty>No transfers yet. The next window opens in January.</Empty>}
+      </div>
       <div className="grid g2" style={{ alignItems: 'start' }}>
-        <div className="card flush"><div className="card-head"><h3>Recent moves</h3><span className="faint">Iranian players · windows open in January and July–August</span></div>
-          {moves.length ? <table className="t"><thead><tr><th>Date</th><th>Player</th><th>From</th><th>To</th><th className="r">Fee</th></tr></thead><tbody>
-            {moves.map(({ p, t }, i) => <tr key={i} className="click" onClick={() => link(`player:${p.id}`)}><td className="faint num">{fmtDay(t.day)}</td><td><b>{p.name}</b></td><td className="muted"><span className="row" style={{ gap: 7 }}>{t.from != null && <ClubBadge clubId={t.from} />}{t.from != null ? world.clubs[t.from].name : 'Free agent'}</span></td><td><span className="row" style={{ gap: 7 }}>{t.to != null && <ClubBadge clubId={t.to} />}{t.to != null ? world.clubs[t.to].name : '–'}{t.to != null && <Flag code={world.clubs[t.to].country} sm />}</span></td><td className="r num">{t.fee ? money(t.fee) : 'Free'}</td></tr>)}
-          </tbody></table> : <Empty>No transfers yet. The next window opens in January.</Empty>}
-        </div>
-        <div className="col" style={{ gap: 18 }}>
-          <div className="card flush"><div className="card-head"><h3>Most valuable Iranians</h3></div><table className="t"><tbody>{top.map((p, i) => <tr key={p.id} className="click" onClick={() => link(`player:${p.id}`)}><td className="faint num" style={{ width: 30 }}>{i + 1}</td><td><PlayerLink p={p} sub={clubOf(world, p)?.name} /></td><td className="c"><Ovr p={p} /></td><td className="r num"><b>{money(p.value)}</b></td></tr>)}</tbody></table></div>
-          <div className="card flush"><div className="card-head"><h3>Iranians abroad</h3><span className="faint">{abroad.length} shown</span></div><table className="t"><tbody>{abroad.map((p) => <tr key={p.id} className="click" onClick={() => link(`player:${p.id}`)}><td><PlayerLink p={p} sub={`${clubOf(world, p)!.name} · ${leagueOf(world, p)!.name}`} /></td><td><Flag code={clubOf(world, p)!.country} /></td><td className="c"><Ovr p={p} /></td><td className="c num">{p.club.mins}′</td><td className="r num">{money(p.value)}</td></tr>)}</tbody></table></div>
-        </div>
+        <div className="card flush"><div className="card-head"><h3>Most valuable Iranians</h3></div><table className="t"><thead><tr><th style={{ width: 30 }}>#</th><th>Player</th><th className="c">Age</th><th className="c">Ovr</th><th className="c">Pot</th><th className="r">Value</th></tr></thead><tbody>{top.map((p, i) => <tr key={p.id} className="click" onClick={() => link(`player:${p.id}`)}><td className="faint num">{i + 1}</td><td><PlayerLink p={p} sub={clubOf(world, p)?.name} /></td><td className="c num">{ageOf(world, p)}</td><td className="c"><Ovr p={p} /></td><td className="c"><Ovr p={p} pot /></td><td className="r num"><b>{money(p.value)}</b></td></tr>)}</tbody></table></div>
+        <div className="card flush"><div className="card-head"><h3>Iranians abroad</h3><span className="faint">{abroad.length} shown, by value</span></div><table className="t"><thead><tr><th>Player</th><th className="c">Age</th><th className="c">Ovr</th><th className="c">Pot</th><th className="c">Mins</th><th className="r">Value</th></tr></thead><tbody>{abroad.map((p) => <tr key={p.id} className="click" onClick={() => link(`player:${p.id}`)}><td><PlayerLink p={p} sub={<><Flag code={clubOf(world, p)!.country} sm />{clubOf(world, p)!.name} · {leagueOf(world, p)!.name}</>} /></td><td className="c num">{ageOf(world, p)}</td><td className="c"><Ovr p={p} /></td><td className="c"><Ovr p={p} pot /></td><td className="c num">{p.club.mins}</td><td className="r num">{money(p.value)}</td></tr>)}</tbody></table></div>
       </div>
     </div>
   )
