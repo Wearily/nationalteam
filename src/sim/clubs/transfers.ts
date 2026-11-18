@@ -40,13 +40,30 @@ function destination(w: World, rng: Rng, p: Player, abroad: boolean, minLevel = 
 export function transferWeek(w: World, rng: Rng, day: Day): Move[] {
   const { m } = ymd(day)
   const summer = m === 7 || m === 8
-  if (!summer && m !== 1) return []
+  const windowOpen = summer || m === 1
   const moves: Move[] = []
   const path = w.fed.pathway / 100
   for (const p of w.players) {
-    if (p.retired || p.clubId == null || p.injury) continue
+    if (p.retired || p.injury) continue
     const iranian = p.nat.includes('IRN')
     if (!iranian) continue
+    if (p.clubId == null) {
+      // free agents can sign at any time of year. Form and a tournament spotlight bring offers sooner and
+      // from better clubs; an unremarkable player without a club waits longer and usually signs at home.
+      const age = ageOn(p.dob, day)
+      if (age < 17 || age > 36 || p.ovr < 52) continue
+      const spot = p.spotlight ?? 0
+      const recent = p.form.slice(-3)
+      const hot = recent.length ? Math.max(0, recent.reduce((a, b) => a + b, 0) / recent.length - 7) : 0
+      const chance = clamp(0.035 + spot * 0.03 + hot * 0.05 + (p.ovr - 60) * 0.002, 0.01, 0.3)
+      if (!rng.chance(chance)) continue
+      const abroad = p.ovr >= 64 && rng.chance(clamp(0.25 + path * 0.4 + spot * 0.07 + hot * 0.1, 0, 0.9))
+      // a player in the spotlight can hold out for a club at or above his level
+      const to = destination(w, rng, p, abroad, spot >= 1 || hot >= 0.5 ? p.ovr - 2 : 0) ?? destination(w, rng, p, abroad) ?? destination(w, rng, p, !abroad)
+      if (to) { moves.push({ player: p, from: null, to, fee: 0 }); move(w, p, to, 0, day) }
+      continue
+    }
+    if (!windowOpen) continue
     const club = w.clubs[p.clubId]
     const lg = w.leagues[club.leagueId]
     const age = ageOn(p.dob, day)
