@@ -408,3 +408,16 @@ h1 { font-size: 36px; font-weight: 720; } h2 { font-size: 22px; } h3 { font-size
 .profile-face .face img { border-radius: 0; object-fit: contain; object-position: 50% 100%; }
 .pcard .f img { object-fit: cover; object-position: 50% 0; }
 .fcard-face img { object-position: 50% 0; }
+
+/* profile portrait: centred in its column on a soft light, details beneath it */
+.profile-face { flex-direction: column; align-items: center; justify-content: center; align-self: stretch; padding: 56px 0 28px; }
+.profile-face::before { content: ''; position: absolute; left: 50%; top: 42%; width: 120%; aspect-ratio: 1; transform: translate(-50%, -50%); background: radial-gradient(closest-side, rgba(255,255,255,0.16), rgba(84,200,220,0.08) 55%, transparent 75%); pointer-events: none; }
+.profile-face .face { position: relative; width: 94%; max-width: 580px; margin: 0; -webkit-mask-image: linear-gradient(#000 80%, transparent 100%); mask-image: linear-gradient(#000 80%, transparent 100%); }
+.profile-face .face img { object-fit: contain; object-position: 50% 50%; image-rendering: auto; }
+.profile-id { position: relative; left: auto; top: auto; bottom: auto; align-self: stretch; margin-top: -26px; padding: 0 44px; display: grid; grid-template-columns: auto 1fr 1fr; align-items: end; gap: 0 22px; }
+.profile-id .big { grid-row: span 2; font-size: 84px; line-height: 0.82; }
+.profile-id small { margin-top: 0; }
+.profile-id b { grid-row: 2; font-size: 16px; }
+.profile-id small:nth-of-type(1), .profile-id b:nth-of-type(1) { grid-column: 2; }
+.profile-id small:nth-of-type(2), .profile-id b:nth-of-type(2) { grid-column: 3; }
+.profile-id small { grid-row: 1; }
