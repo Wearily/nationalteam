@@ -7,6 +7,7 @@ import type { GroupStage } from '../../sim/comps/types'
 import { teamName } from '../../sim/intl/select'
 import { LEVEL_NAME, type Fixture } from '../../sim/world/types'
 import { clubOf, Flag, FormDots, isAbroad, Meter, money, Ovr, PlayerLink, PosTag, Rating, tone } from '../bits'
+import { FIFA_ISO } from '../flags'
 import { useGame } from '../store'
 
 export function ResultRow({ f, mine = 'n:IRN:senior' }: { f: Fixture; mine?: string }) {
@@ -54,14 +55,14 @@ export function Home() {
   return (
     <div className="page-inner">
       <div className="grid g-main">
-        <div className="card" style={{ padding: 28, background: 'linear-gradient(135deg, rgba(22,163,74,0.2), rgba(255,255,255,0.03) 42%, rgba(220,38,38,0.2))' }}>
+        <div className="hero">
           {next && opp ? (
             <>
               <div className="row"><span className="eyebrow">Next match · {world.comps[next.compId].name}</span><span className="pill right">{fmtDay(next.day)}</span></div>
               <div className="row" style={{ justifyContent: 'center', gap: 44, padding: '30px 0 24px' }}>
-                <div className="col center" style={{ alignItems: 'center', gap: 12 }}><Flag code="IRN" lg /><h1>Iran</h1><span className="muted">#{iran.rank} in the world</span></div>
+                <div className="col center" style={{ alignItems: 'center', gap: 12 }}><span className="flag xl fi fi-ir" /><h1>Iran</h1><span className="muted">#{iran.rank} in the world</span></div>
                 <div className="col center" style={{ alignItems: 'center' }}><span className="faint" style={{ fontSize: 13, fontWeight: 600 }}>{next.neutral ? 'Neutral venue' : next.home === ref ? 'Home' : 'Away'}</span><span style={{ fontSize: 34, fontWeight: 300, opacity: 0.5 }}>vs</span><span className="pill blue">{next.day - world.day === 0 ? 'Today' : `in ${next.day - world.day} days`}</span></div>
-                <div className="col center" style={{ alignItems: 'center', gap: 12 }}><Flag code={oppCode} lg /><h1>{opp.name}</h1><span className="muted">#{world.nations[oppCode]?.rank ?? '–'} in the world</span></div>
+                <div className="col center" style={{ alignItems: 'center', gap: 12 }}><span className={`flag xl fi fi-${FIFA_ISO[oppCode] ?? 'xx'}`} /><h1>{opp.name}</h1><span className="muted">#{world.nations[oppCode]?.rank ?? '–'} in the world</span></div>
               </div>
               <div className="row" style={{ justifyContent: 'center' }}>
                 <button className="btn" onClick={() => go({ name: 'teams', level: 'senior', tab: 'callup' })}>Squad</button>

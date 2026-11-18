@@ -2,7 +2,7 @@ import { ymd, type Day } from '../core/date'
 import { clamp, hashStr, type Rng } from '../core/rng'
 import type { Pos } from '../data/raw'
 import { effectiveOverall, posLine } from '../ratings/attributes'
-import { formAvg } from '../clubs/season'
+import { dynOvr, engineDelta } from '../ratings/dynamic'
 import { defaultRole, emptyTactic, FORMATION_KEYS, FORMATIONS, type Tactic } from '../match/tactics'
 import type { MPlayer, MTeam } from '../match/types'
 import { makePlayer } from '../world/build'
@@ -29,7 +29,7 @@ const TEMPLATE: Pos[] = ['GK', 'GK', 'GK', 'RB', 'RB', 'CB', 'CB', 'CB', 'CB', '
 export function selectionScore(w: World, p: Player, bias = 0): number {
   const lg = p.clubId != null ? w.leagues[w.clubs[p.clubId].leagueId] : null
   const abroad = lg ? lg.country !== 'IRN' : false
-  return p.ovr + (formAvg(p) - 6.6) * 2.4 + (p.sharp - 70) * 0.05 + Math.min(2.5, p.caps / 25) + (p.nat[0] === 'IRN' ? bias * (abroad ? 2.2 : -2.2) : 0)
+  return dynOvr(p).ovr + Math.min(2.5, p.caps / 25) + (p.nat[0] === 'IRN' ? bias * (abroad ? 2.2 : -2.2) : 0)
 }
 
 /** Make sure a nation has enough eligible players at a level; generate anonymous ones if not. */
@@ -103,7 +103,7 @@ export function pickXI(players: Player[], formation: string): { lineup: number[]
   const avail = players.filter((p) => !p.injury)
   const lineup = new Array(11).fill(-1)
   const used = new Set<number>()
-  const val = (p: Player, s: number) => effectiveOverall(p.attrs, p.pos, slots[s].pos) + (formAvg(p) - 6.6) * 1.5 + (p.cond - 90) * 0.15 + (p.sharp - 70) * 0.03
+  const val = (p: Player, s: number) => effectiveOverall(p.attrs, p.pos, slots[s].pos) + dynOvr(p).total
   // goalkeeper first
   const gks = avail.filter((p) => p.pos[0] === 'GK').sort((a, b) => val(b, 0) - val(a, 0))
   if (gks[0]) { lineup[0] = gks[0].id; used.add(gks[0].id) }
@@ -132,9 +132,11 @@ export const shortName = (name: string) => {
   return parts.length > 1 ? parts.slice(1).join(' ') : name
 }
 export function toMPlayer(p: Player, i: number): MPlayer {
+  // dynamic overall: form, morale and sharpness shift every attribute for this match
+  const d = engineDelta(p)
   return {
-    id: p.id, name: p.name, short: shortName(p.name), num: p.num ?? i + 1, pos: p.pos, attrs: p.attrs,
-    cond: clamp(p.cond * (0.92 + 0.08 * (p.sharp / 100)), 40, 100), form: clamp((formAvg(p) - 6.7) / 1.1, -1, 1),
+    id: p.id, name: p.name, short: shortName(p.name), num: p.num ?? i + 1, pos: p.pos, attrs: d ? p.attrs.map((a) => clamp(a + d, 1, 99)) : p.attrs,
+    cond: clamp(p.cond, 40, 100), form: 0,
     consistency: p.traits.consistency, bigMatch: p.traits.bigMatch, injuryProne: p.traits.injuryProne,
   }
 }

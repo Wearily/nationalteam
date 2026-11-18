@@ -52,14 +52,14 @@ function cached(kind: string, key: string, gap: number, host: string, doFetch: (
 
 function safeName(t: string) { return t.replace(/[^A-Za-z0-9._-]+/g, '_').slice(0, 80) + '.' + sha(t).slice(0, 8) }
 
-/** Raw wikitext of an en.wikipedia page (follows #REDIRECT). null if missing. */
-export function wikitext(title: string, depth = 0): string | null {
+/** Raw wikitext of a Wikipedia page (follows #REDIRECT). null if missing. `lang` = 'en' (default) or 'fa'. */
+export function wikitext(title: string, depth = 0, lang = 'en'): string | null {
   const t = title.replace(/ /g, '_')
-  const body = cached('wp', safeName(t) + '.wiki', 2500, 'en.wikipedia.org',
-    () => curl(`https://en.wikipedia.org/w/index.php?title=${encodeURIComponent(t)}&action=raw`))
+  const body = cached(lang === 'en' ? 'wp' : 'wp-' + lang, safeName(t) + '.wiki', 2500, 'en.wikipedia.org',
+    () => curl(`https://${lang}.wikipedia.org/w/index.php?title=${encodeURIComponent(t)}&action=raw`))
   if (body == null) return null
-  const m = body.match(/^\s*#REDIRECT\s*\[\[([^\]|#]+)/i)
-  if (m && depth < 3) return wikitext(m[1].trim(), depth + 1)
+  const m = body.match(/^\s*#(?:REDIRECT|تغییر_?مسیر|تغییرمسیر)\s*\[\[([^\]|#]+)/i)
+  if (m && depth < 3) return wikitext(m[1].trim(), depth + 1, lang)
   return body
 }
 export function commonsText(file: string): string | null {
@@ -186,3 +186,42 @@ export function readJson<T>(f: string): T { return JSON.parse(readFileSync(f, 'u
 export function writeJson(f: string, v: unknown, pretty = true) { mkdirSync(dirname(f), { recursive: true }); writeFileSync(f, pretty ? JSON.stringify(v, null, 1) : JSON.stringify(v)) }
 export const OUT = join(CACHE, 'stage')
 export { existsSync, statSync }
+
+// ---------- Wikimedia image thumbnails ----------
+// Notes from probing upload.wikimedia.org: (1) Special:FilePath redirects to thumb.wikimedia.org, unreachable here, so URLs are
+// built directly; (2) only fixed thumbnail widths are served (…120, 250, 330, 500…); (3) requests come in a small burst budget:
+// beyond it everything answers 429 (even missing files, which otherwise 404), and a file that does not
+// exist on that wiki can answer 429 instead of 404, and original-file URLs are refused to bots, so callers should know which
+// wiki hosts the file. A first request for a not-yet-rendered thumbnail also tends to answer 429 and succeed later, so the
+// download scripts make several passes over the outstanding files instead of waiting on each one. Callers should know which wiki hosts the file (logos: a local en.wikipedia File: page exists or not; photos: always Commons).
+import { createHash as _md5 } from 'node:crypto'
+import { readFileSync as _rf, unlinkSync as _rm } from 'node:fs'
+let lastImg = 0
+function imgThrottle() { const wait = lastImg + 1500 - Date.now(); if (wait > 0) spawnSync('sleep', [String(wait / 1000)]); lastImg = Date.now() }
+export function imageKind(path: string): 'png' | 'jpg' | null {
+  if (!existsSync(path)) return null
+  const b = _rf(path); if (b.length <= 500) return null
+  if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return 'png'
+  if (b[0] === 0xff && b[1] === 0xd8) return 'jpg'
+  return null
+}
+/** Download a `width`px thumbnail of a wiki file to `tmp` from the given wiki ('en' | 'commons'). Returns the image kind, or null with a reason. */
+export function fetchThumb(fileName: string, width: number, tmp: string, sites: string[], attempts = 1): { kind: 'png' | 'jpg' | null; why?: string } {
+  const f0 = fileName.trim().replace(/ /g, '_'); const file = f0[0].toUpperCase() + f0.slice(1)
+  const md5 = _md5('md5').update(file).digest('hex'); const enc = encodeURIComponent(file)
+  const ext = file.split('.').pop()!.toLowerCase()
+  let why = 'not found'; let limited = false
+  for (const site of sites) {
+    const url = `https://upload.wikimedia.org/wikipedia/${site}/thumb/${md5[0]}/${md5.slice(0, 2)}/${enc}/${width}px-${enc}${ext === 'svg' ? '.png' : ext === 'tif' || ext === 'tiff' ? '.jpg' : ''}`
+    for (let a = 0; a < attempts; a++) {
+      imgThrottle()
+      const r = curl(url, { out: tmp })
+      if (r.status === 200) { const k = imageKind(tmp); if (k) return { kind: k }; why = 'not a PNG/JPEG'; break }
+      why = `HTTP ${r.status}`; if (r.status === 429) limited = true
+      if (r.status === 429 && a < attempts - 1) { spawnSync('sleep', [String(8 * (a + 1))]); continue } // 429 = rate limit, thumbnail still rendering, or missing file
+      break
+    }
+  }
+  if (existsSync(tmp)) _rm(tmp)
+  return { kind: null, why: limited ? 'HTTP 429' : why }
+}

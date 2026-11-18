@@ -3,7 +3,8 @@ import { pickXI } from '../../sim/intl/select'
 import { defaultRole, FORMATION_KEYS, FORMATIONS, ROLE, rolesFor, SLIDERS, type Tactic } from '../../sim/match/tactics'
 import { effectiveOverall } from '../../sim/ratings/attributes'
 import type { Player } from '../../sim/world/types'
-import { Avatar, ovrColor, PosTag } from '../bits'
+import { dynOvr } from '../../sim/ratings/dynamic'
+import { Avatar, Face, Ovr, ovrColor, PosTag } from '../bits'
 import { useGame } from '../store'
 
 /** Make sure a tactic has a legal eleven drawn from the squad; fills gaps with the best available. */
@@ -49,7 +50,7 @@ export function TacticsEditor({ tactic, squad, onChange, energy, locked, compact
   }
   const selSlot = sel != null ? slots[sel] : null
   return (
-    <div className="grid" style={{ gridTemplateColumns: compact ? '340px 1fr' : '400px minmax(0,1fr) 330px', alignItems: 'start' }}>
+    <div className="grid" style={{ gridTemplateColumns: compact ? '460px 1fr' : '500px minmax(0,1fr) 300px', alignItems: 'start' }}>
       <div className="col">
         <div className="row"><select className="input grow" value={tactic.formation} onChange={(e) => changeFormation(e.target.value)}>{FORMATION_KEYS.map((f) => <option key={f}>{f}</option>)}</select></div>
         <div className="board">
@@ -58,15 +59,17 @@ export function TacticsEditor({ tactic, squad, onChange, energy, locked, compact
           </svg>
           {slots.map((s, i) => {
             const p = byId.get(tactic.lineup[i])
-            const eff = p ? effectiveOverall(p.attrs, p.pos, s.pos) : 0
+            const eff = p ? effectiveOverall(p.attrs, p.pos, s.pos) + dynOvr(p).total : 0
             const e = p && energy ? energy[p.id] : undefined
             return (
-              <div key={i} className={`slot ${sel === i ? 'sel' : ''}`} style={{ left: `${8 + s.y * 84}%`, top: `${93 - s.x * 104}%` }} onClick={() => clickSlot(i)}>
-                <div className="disc" style={{ background: p ? ovrColor(eff) : 'rgba(255,255,255,0.25)' }}>{p ? eff : '+'}
-                  {tactic.captain === p?.id && <span style={{ position: 'absolute', right: -6, top: -6, background: '#facc15', borderRadius: 9, fontSize: 9, width: 16, height: 16, display: 'grid', placeItems: 'center' }}>C</span>}
+              <div key={i} className={`slot ${sel === i ? 'sel' : ''}`} style={{ left: `${9 + s.y * 82}%`, top: `${90 - s.x * 100}%` }} onClick={() => clickSlot(i)}>
+                <div className="pcard">
+                  {p && <div className="f"><Face p={p} /></div>}
+                  <span className="o" style={{ color: p ? ovrColor(eff) : '#fff' }}>{p ? eff : '+'}</span>
+                  {e != null && <div className="bar"><i style={{ width: `${e}%`, background: e > 70 ? '#3ddc97' : e > 55 ? '#f2c46d' : '#e85d65' }} /></div>}
+                  <span className="p">{s.pos}{tactic.captain === p?.id ? ' · C' : ''}</span>
                 </div>
-                <span className="nm">{p ? p.name.split(' ').slice(1).join(' ') || p.name : s.pos}</span>
-                <span className="rl">{ROLE[tactic.roles[i]]?.name ?? s.pos}{e != null ? ` · ${Math.round(e)}%` : ''}</span>
+                <span className="nm">{p ? p.name.split(' ').slice(-1)[0] : s.pos}</span>
               </div>
             )
           })}
@@ -89,7 +92,7 @@ export function TacticsEditor({ tactic, squad, onChange, energy, locked, compact
               <tr key={p.id} className={sel != null && !dis ? 'click' : ''} style={{ opacity: dis ? 0.38 : 1 }} onClick={() => clickBench(p)}>
                 <td><span className="row" style={{ gap: 9 }}><Avatar p={p} size={26} /><span style={{ fontWeight: 560 }}>{p.name}</span>{p.injury && <span className="pill red">Inj</span>}{locked?.has(p.id) && <span className="pill">Used</span>}</span></td>
                 <td><span className="row" style={{ gap: 4 }}>{p.pos.slice(0, 2).map((x) => <PosTag key={x} pos={x} />)}</span></td>
-                <td className="c"><span className="ovr" style={{ background: ovrColor(p.ovr) }}>{p.ovr}</span></td>
+                <td className="c"><Ovr p={p} /></td>
                 <td className="c num">{selSlot ? effectiveOverall(p.attrs, p.pos, selSlot.pos) : '–'}</td>
                 <td className="c num">{Math.round(p.cond)}%</td><td className="c num">{Math.round(p.sharp)}%</td>
               </tr>

@@ -1,6 +1,7 @@
 import { nextDow, toDay, ymd, type Day } from '../core/date'
 import { clamp, type Rng } from '../core/rng'
 import { A, posLine } from '../ratings/attributes'
+import { dynOvr } from '../ratings/dynamic'
 import { makeGroupFixtures } from '../comps/engine'
 import type { Comp } from '../comps/types'
 import type { Index, World } from '../world/state'
@@ -35,7 +36,7 @@ interface Side { clubId: number; str: number; starters: Player[]; subs: Player[]
 function lineupFor(w: World, idx: Index, clubId: number, rng: Rng, away: Set<number>): Side {
   const club = w.clubs[clubId]
   const all = (idx.clubPlayers.get(clubId) ?? []).filter((p) => !p.injury && !away.has(p.id) && !p.retired)
-  const score = (p: Player) => p.ovr + (formAvg(p) - 6.6) * 2 + rng.normal(0, 2.2) + (p.cond < 70 ? -6 : 0)
+  const score = (p: Player) => dynOvr(p).ovr + rng.normal(0, 2.2) + (p.cond < 70 ? -4 : 0)
   if (club.full) {
     const sorted = [...all].sort((a, b) => score(b) - score(a))
     const starters: Player[] = []
@@ -54,7 +55,7 @@ function lineupFor(w: World, idx: Index, clubId: number, rng: Rng, away: Set<num
   const starters: Player[] = []
   const subs: Player[] = []
   for (const p of all) {
-    const pStart = 1 / (1 + Math.exp(-(p.ovr - club.str + 2.5) / 2.4))
+    const pStart = 1 / (1 + Math.exp(-(p.ovr + dynOvr(p).form - club.str + 2.5) / 2.4))
     const r = rng.next()
     if (r < pStart * (p.sharp < 40 ? 0.8 : 1)) starters.push(p)
     else if (r < pStart + (1 - pStart) * 0.4) subs.push(p)

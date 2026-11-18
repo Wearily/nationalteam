@@ -99,6 +99,9 @@ const want = (title?: string) => { const q = title && tinfo.get(title)?.qid; if 
 for (const s of sq.clubSquads) { for (const p of s.players) want(p.title); want(s.manager?.title); for (const st of s.staff ?? []) want(st.title) }
 for (const t of sq.nts) if (t.code === 'IRN') { for (const p of t.players) want(p.title); want(t.coach?.title); for (const st of t.staff ?? []) want(st.title) }
 for (const c of lg.clubs) if (c.country === 'IRN') want(c.managerTitle)
+const faStage: { squads: any[]; notes: string[] } = existsSync(join(OUT, 'fa-squads.json')) ? readJson(join(OUT, 'fa-squads.json')) : { squads: [], notes: [] }
+const faCurrent = (season?: string) => !!season && /140[56]|^0?5\s*[–-]|[–-]\s*0?6$|2026/.test(season)
+for (const s of faStage.squads) if (faCurrent(s.season)) for (const p of s.players) if (p.qid && p.en && p.dob && !people.has(p.qid)) extraQ.add(p.qid)
 const extra = bulkPeople([...extraQ])
 for (const [k, v] of extra) people.set(k, v)
 
@@ -113,6 +116,7 @@ const refs = new Set<string>()
 for (const v of clubTitleCountry.values()) if (v.country) refs.add(v.country)
 for (const p of people.values()) { for (const x of p.p54) refs.add(x.team); for (const k of ['P27', 'P1532', 'P413']) for (const v of p.props[k] ?? []) refs.add(v); for (const c of p.birthCountries) refs.add(c) }
 for (const v of tinfo.values()) for (const p of v.pos) refs.add(p)
+for (const s of faStage.squads) for (const p of s.players) for (const x of p.wdPos ?? []) refs.add(x)
 const info = refInfo([...refs])
 
 { const more = [...info.values()].map(v => v.country).filter(c => c && !info.has(c)) as string[]; if (more.length) for (const [k, v] of refInfo(more)) info.set(k, v) }
@@ -335,6 +339,30 @@ for (const s of sq.clubSquads) {
   }
 }
 stats.squadTotal = squadTotal; stats.squadNoDob = squadNoDob
+// 2b) fa.wikipedia squads of the same clubs: adds players whose English article is a red link.
+let faAdded = 0, faSkipped = 0, faTotal = 0; const faClubsUsed: string[] = []; const faClubsStale: string[] = []
+for (const s of faStage.squads) {
+  if (!s.players.length) continue
+  if (!faCurrent(s.season)) { faClubsStale.push(`${s.clubId}${s.season ? ` (season ${s.season})` : ' (no season stated)'}`); continue }
+  faClubsUsed.push(s.clubId); if (s.players.length >= 14) squadClubsParsed.add(s.clubId)
+  for (const fp of s.players) {
+    faTotal++
+    if (!(fp.qid && fp.en && fp.dob && /[A-Za-z]/.test(fp.en))) { faSkipped++; continue }
+    let pl = players.get(fp.qid)
+    if (pl && inSquad.has(pl.id)) continue
+    const iranian = /ایران/.test(fp.natFa ?? '')
+    if (!pl && people.has(fp.qid)) { const b = buildFromWD(people.get(fp.qid)!, fp.pos); if (b) { pl = b.pl; if (!pl.nat.length && iranian) pl.nat = ['IRN']; if (pl.nat.length) { addPlayer(pl, 'none'); linkOf.set(pl.id, pl.nat.includes('IRN') ? 'fa-squad' : 'foreign') } else pl = undefined } }
+    if (!pl && iranian) { const dob = fp.dob.endsWith('-01-01') ? `${fp.dob.slice(0, 4)}-07-01` : fp.dob; pl = { id: fp.qid, name: fp.en, dob, nat: ['IRN'], pos: [], club: null, src: 'fa:club-squad' }; addPlayer(pl, 'none'); linkOf.set(pl.id, 'fa-squad') }
+    if (!pl) { faSkipped++; continue }
+    const age = NOW_YEAR - Number(pl.dob.slice(0, 4))
+    const pos = positions(posLabels([...(people.get(pl.id)?.props.P413 ?? []), ...(fp.wdPos ?? [])]), fp.pos || undefined, pl.id)
+    if (age < 15 || age > 45 || !pos.length) { if (meta.get(pl.id)?.clubSrc === 'none' && !iranSet.has(pl.id)) players.delete(pl.id); faSkipped++; continue }
+    pl.pos = pos; pl.club = s.clubId; if (fp.no && pl.num === undefined) pl.num = fp.no
+    if (!pl.src!.includes('fa:club-squad')) pl.src += '+fa:club-squad'
+    meta.get(pl.id)!.clubSrc = 'fa:club-squad'; inSquad.add(pl.id); faAdded++
+  }
+}
+reindexDob()
 
 // 3) national-team squads
 const ntStats: Record<string, { cur: number; rec: number; added: number; noDob: number }> = {}
@@ -517,6 +545,11 @@ for (const q of sets.coaches as string[]) {
 }
 
 // ---------------------------------------------------------------- output
+const logos: Record<string, any> = existsSync(join(OUT, 'logos.json')) ? readJson(join(OUT, 'logos.json')) : {}
+let logoCount = 0
+for (const c of clubs.values()) { const l = logos[c.id]?.logo; if (l && existsSync(join(ROOT, 'public', l))) { (c as any).logo = l; logoCount++ } }
+const logoMissing = lg.clubs.filter(c => !(clubs.get(c.id) as any)?.logo).map(c => `${c.id} (${logos[c.id]?.none ?? 'not attempted'})`)
+const photoFailed: string[] = existsSync(join(OUT, 'photos-failed.json')) ? readJson(join(OUT, 'photos-failed.json')) : []
 const usedClubs = new Set<string>(); for (const p of players.values()) if (p.club) usedClubs.add(p.club)
 const outClubs = [...clubs.values()].filter(c => !c.league.startsWith('other-') || usedClubs.has(c.id) || [...staff.values()].some(s => s.job === `club:${c.id}`))
   .map(({ _titles, ...c }) => JSON.parse(JSON.stringify(c)))
@@ -564,6 +597,7 @@ Snapshot \`asOf\` ${AS_OF}, generated ${new Date().toISOString().slice(0, 10)} b
 | Nations | ${nations.length} (FIFA ranking of ${rankDate}) |
 | National teams with a real squad | ${ntReal.length} of ${ntCodesWanted.length} attempted |
 | Staff | ${staff.size} (${[...staff.values()].filter(s => s.job).length} with a current job) |
+| Club logos | ${logoCount} of ${lg.clubs.length} covered-league clubs (Iranian clubs: ${lg.clubs.filter(c => c.country === 'IRN' && (clubs.get(c.id) as any)?.logo).length} of ${lg.clubs.filter(c => c.country === 'IRN').length}) |
 | Photos | ${photoCount} downloaded (of ${Object.keys(photoWanted).length} Iran-eligible players with a Wikidata image) |
 
 ### Iranian players abroad (first nationality IRN, by country of club)
@@ -580,7 +614,7 @@ Iran-first players at Iranian clubs: ${iranFirst.filter(p => clubCountry(p) === 
 |---|---|
 ${tbl(linkCount)}
 
-Legend: \`citizen\` = Wikidata citizenship/sporting country Iran only; \`dual-iran-first\` = Iranian plus other citizenship and has represented Iran (or born in Iran); \`dual-other-first\` = several citizenships, no Iran appearance recorded, other country listed first; \`born-abroad\` = Iranian citizenship only but born outside Iran; \`born-in-iran-foreign\` = born in Iran, Wikidata citizenship is another country (eligibility **unverified**); \`born-in-iran-no-citizenship-data\` = born in Iran, no citizenship recorded, treated as Iranian; \`persian-speaking\` = Persian listed as language, non-Iranian citizenship (eligibility **unverified**); \`seed\` = hand-kept list in \`pipeline/diaspora.seed.ts\`; \`wp-squad\` = Iranian found only through a club squad page + own article; \`foreign\`/\`nt-squad\`/\`other\` = reached through squad pages.
+Legend: \`citizen\` = Wikidata citizenship/sporting country Iran only; \`dual-iran-first\` = Iranian plus other citizenship and has represented Iran (or born in Iran); \`dual-other-first\` = several citizenships, no Iran appearance recorded, other country listed first; \`born-abroad\` = Iranian citizenship only but born outside Iran; \`born-in-iran-foreign\` = born in Iran, Wikidata citizenship is another country (eligibility **unverified**); \`born-in-iran-no-citizenship-data\` = born in Iran, no citizenship recorded, treated as Iranian; \`persian-speaking\` = Persian listed as language, non-Iranian citizenship (eligibility **unverified**); \`seed\` = hand-kept list in \`pipeline/diaspora.seed.ts\`; \`wp-squad\` = Iranian found only through a club squad page + own article; \`fa-squad\` = found through the Persian club page; \`foreign\`/\`nt-squad\`/\`other\` = reached through squad pages.
 
 ### Clubs per league (and players attached)
 
@@ -607,6 +641,10 @@ ${tbl(clubSrcCount)}
 ${squadTotal} squad entries read from ${sq.clubSquads.filter(s => s.players.length).length} of ${lg.clubs.filter(c => c.country === 'IRN').length} Iranian club pages; ${squadTotal - squadNoDob} had a date of birth (from the player's own article infobox or a matched Wikidata item) and were kept, **${squadNoDob} skipped** — almost all are red links (no English article), so no DOB is obtainable and \`dob\` is mandatory. Player articles requested: ${stats.pagesRead}, of which ${stats.pagesMissing} do not exist.
 
 ${sq.notes.filter(n => n.startsWith('club ')).map(n => '- ' + n).join('\n')}
+
+### fa.wikipedia squads (coverage booster)
+
+${faStage.squads.length ? `Read ${faStage.squads.filter(s => s.players.length).length} Persian club articles; ${faClubsUsed.length} state the current season and were used. ${faTotal} squad entries on those pages → **${faAdded} extra players placed** at their club (not already placed via the English page); ${faSkipped} skipped (no Wikidata item, no English label to romanise with, no DOB, or no position). Names come only from the Wikidata English label.${faClubsStale.length ? ` Not used (squad list not for the current season): ${faClubsStale.join(', ')}.` : ''}` : 'Not run.'}
 
 ### National squads
 
@@ -638,7 +676,9 @@ Positions: ${posFromCoarseOnly} squad players had no Wikidata position; their GK
 - **\`capTied\`** is set when senior caps ≥ 5 (proxy for having played a competitive match); it is omitted otherwise. Caps/goals come from national-team pages where available, else from Wikidata qualifiers (often stale).
 - **Nationality from Wikidata** maps "United Kingdom" to ENG. Squad-page flags override Wikidata ordering.
 - **Diaspora detection is weak**: Wikipedia categories ("… of Iranian descent") cannot be read without the API, and Wikidata has no ethnic-group data for footballers (0 hits). Candidates come only from multi-citizenship, birthplace, language statements and a 4-name seed list. Many real dual nationals are therefore missing, and the \`born-in-iran-foreign\` / \`persian-speaking\` groups are unverified.
-- **Photos**: 250px thumbnails (Wikimedia serves fixed thumbnail steps; 256 is not one) saved to \`public/faces/\`. Credit lines are parsed from the Commons file page (author + licence) and fall back to "Wikimedia Commons: <file>".
+- **Photos**: 250px-wide thumbnails (Wikimedia only serves fixed thumbnail widths; 256 is refused, and \`Special:FilePath\` redirects to thumb.wikimedia.org which is unreachable here, so upload.wikimedia.org thumbnail URLs are built directly). Source is Wikidata P18, else the image in the player's en.wikipedia infobox. Saved as \`public/faces/<id>.jpg|png\`. Credit lines are parsed from the Commons file page (author + licence) and fall back to "Wikimedia Commons: <file>". ${photoFailed.length} wanted photos could not be downloaded.
+- **Club logos**: the infobox image of the club's en.wikipedia article, as a 120px-wide thumbnail (closest served step to 128) in \`public/logos/<clubId>.png|jpg\`; tried on en.wikipedia first (non-free crests), then Commons. Not attempted for \`other-*\` clubs. No Wikidata P154 fallback was needed/used. Most crests are non-free images used on Wikipedia under fair use — fine for a private hobby build, but they are **not** freely licensed. Clubs without a logo (${logoMissing.length}): ${logoMissing.join('; ') || 'none'}.
+- **Nation codes** are the ones used by Wikipedia's ranking module. Checked against FIFA's list: the only non-FIFA code is **SGP** (FIFA: SIN) for Singapore.
 - \`foot\` and \`valueEur\` are never set (no source reachable).
 
 ## Dropped records
@@ -664,7 +704,7 @@ npx tsx pipeline/07-validate.ts  # validate public/data/world.json
 `
 mkdirSync(join(ROOT, 'data'), { recursive: true })
 writeFileSync(join(ROOT, 'data', 'REPORT.md'), md)
-console.log(`world.json: ${P.length} players (${iranFirst.length} IRN-first, ${iranAny.length} IRN-any, ${dual.length} dual/diaspora), ${outClubs.length} clubs, ${outLeagues.length} leagues, ${nations.length} nations, ${staff.size} staff, ${photoCount} photos`)
+console.log(`world.json: ${P.length} players (${iranFirst.length} IRN-first, ${iranAny.length} IRN-any, ${dual.length} dual/diaspora), ${outClubs.length} clubs, ${outLeagues.length} leagues, ${nations.length} nations, ${staff.size} staff, ${photoCount} photos, ${logoCount} logos`)
 console.log('squad entries', squadTotal, 'unmatched', squadNoDob, 'unmatched with link', sq.clubSquads.flatMap((s: any) => s.players).filter((p: any) => p.title && !tinfo.get(p.title)).length)
 console.log('dropped:', dropped)
 console.log('club src:', clubSrcCount)

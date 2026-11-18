@@ -2,6 +2,7 @@ import type { CSSProperties, ReactNode } from 'react'
 import { ageOn } from '../sim/core/date'
 import { hashStr } from '../sim/core/rng'
 import { faceStats, posLine } from '../sim/ratings/attributes'
+import { dynOvr } from '../sim/ratings/dynamic'
 import type { World } from '../sim/world/state'
 import type { Player, Pos } from '../sim/world/types'
 import { FIFA_ISO } from './flags'
@@ -53,8 +54,16 @@ export function PosTag({ pos }: { pos: Pos }) {
 }
 export function Ovr({ p, pot }: { p: Player; pot?: boolean }) {
   const v = scoutView(p)
-  if (v.exact) { const x = pot ? p.pot : p.ovr; return <span className="ovr" style={{ background: ovrColor(x) }}>{x}</span> }
-  return <span className="ovr range">{pot ? `${v.potLo}–${v.potHi}` : `${v.lo}–${v.hi}`}</span>
+  if (!v.exact) return <span className="ovr range">{pot ? `${v.potLo}–${v.potHi}` : `${v.lo}–${v.hi}`}</span>
+  if (pot) return <span className="ovr" style={{ background: ovrColor(p.pot) }}>{p.pot}</span>
+  // dynamic overall: baseline moved by form, morale and fitness
+  const d = dynOvr(p)
+  return (
+    <span className="ovr-wrap" title={`Baseline ${d.base} · form ${d.form >= 0 ? '+' : ''}${d.form} · morale ${d.morale >= 0 ? '+' : ''}${d.morale} · fitness ${d.fitness >= 0 ? '+' : ''}${d.fitness}`}>
+      <span className="ovr" style={{ background: ovrColor(d.ovr) }}>{d.ovr}</span>
+      {d.total !== 0 && <span className={`ovr-d ${d.total > 0 ? 'up' : 'down'}`}>{d.total > 0 ? '▲' : '▼'}{Math.abs(d.total)}</span>}
+    </span>
+  )
 }
 export function OvrNum({ v }: { v: number }) {
   return <span className="ovr" style={{ background: ovrColor(v) }}>{Math.round(v)}</span>
