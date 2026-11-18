@@ -175,7 +175,12 @@ export function ScoreEvents({ events, names }: { events: MEvent[]; names: (id: n
     for (const e of events) if (e.team === t && types.includes(e.type) && e.p != null) (m.get(e.p) ?? m.set(e.p, []).get(e.p)!).push(`${e.min}${e.plus ? `+${e.plus}` : ''}'${e.type === 'pen' ? ' (Pen)' : ''}`)
     return [...m.entries()].map(([id, mins]) => `${names(id).split(' ').slice(-1)[0]} ${mins.join(', ')}`)
   }
-  const rows: [string, string[], string[]][] = [['⚽', side(0, ['goal', 'pen']), side(1, ['goal', 'pen'])], ['🟥', side(0, ['red']), side(1, ['red'])]]
+  const assists = (t: number) => {
+    const m = new Map<number, string[]>()
+    for (const e of events) if (e.team === t && e.type === 'goal' && e.q != null) (m.get(e.q) ?? m.set(e.q, []).get(e.q)!).push(`${e.min}${e.plus ? `+${e.plus}` : ''}'`)
+    return [...m.entries()].map(([id, mins]) => `${names(id).split(' ').slice(-1)[0]} ${mins.join(', ')}`)
+  }
+  const rows: [string, string[], string[]][] = [['⚽', side(0, ['goal', 'pen']), side(1, ['goal', 'pen'])], ['🅰️', assists(0), assists(1)], ['🟥', side(0, ['red']), side(1, ['red'])]]
   if (rows.every((r) => !r[1].length && !r[2].length)) return null
   return (
     <div className="score-events">

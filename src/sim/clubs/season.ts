@@ -99,7 +99,7 @@ function credit(side: Side, goals: number, conceded: number, rng: Rng, f: Fixtur
       rating.set(scorer.id, rating.get(scorer.id)! + 0.95)
       ;(f.scorers ??= []).push([scorer.id, min, sideIdx])
     }
-    if (rng.chance(0.72)) {
+    if (rng.chance(0.78)) {
       const totA = involved.reduce((a, x) => a + (x[0] === scorer ? 0 : wOf(AST_W, A.passing)(x)), 0) + anonW * 1.3
       let ra = rng.next() * totA
       for (const x of involved) {

@@ -24,8 +24,9 @@ export function xgModel(dist: number, offCentre: number, pressure: number, heade
   const dx2 = Math.max(0.25, dist * dist - offCentre * offCentre)
   const theta = Math.atan2(7.32 * Math.sqrt(dx2), Math.max(0.1, dist * dist - 3.66 * 3.66))
   let xg = sig(-1.86 - 0.1 * dist + 1.7 * Math.min(theta, 1.6))
-  if (header) xg *= 0.42
-  xg *= 1 - 0.4 * pressure
+  // headers are harder, but a marker matters less to a header than to a shot along the ground
+  if (header) xg *= 0.78
+  xg *= 1 - (header ? 0.2 : 0.4) * pressure
   return clamp(xg, 0.01, 0.92)
 }
 
@@ -643,7 +644,7 @@ export class MatchSim {
     const near = this.nearestOpp(t, this.px[g], this.py[g], true)
     const pressure = kind === 'pen' || kind === 'fk' ? 0 : clamp(1 - near.d / 6, 0, 1)
     const header = kind === 'header' || kind === 'corner'
-    let xg = kind === 'pen' ? 0.77 : kind === 'fk' ? clamp(0.11 - dist / 400, 0.03, 0.09) : xgModel(dist, gdy, pressure, header)
+    let xg = kind === 'pen' ? 0.77 : kind === 'fk' ? clamp(0.085 - dist / 420, 0.02, 0.055) : xgModel(dist, gdy, pressure, header)
     const fin = kind === 'pen' ? this.at(t, s, A.penalties) : kind === 'fk' ? this.at(t, s, A.setPieces) : header ? this.at(t, s, A.heading) : dist > 18 ? (this.at(t, s, A.longShots) + this.at(t, s, A.finishing)) / 2 : (this.at(t, s, A.finishing) * 0.7 + this.at(t, s, A.composure) * 0.3)
     const gk = this.on[o][0] >= 0 ? this.at(o, 0, A.reflexes) * 0.45 + this.at(o, 0, A.handling) * 0.2 + this.at(o, 0, A.oneOnOnes) * 0.2 + this.at(o, 0, A.positioning) * 0.15 : 25
     st.shots++; this.ts[t].shots++
@@ -653,7 +654,7 @@ export class MatchSim {
     const assist = this.lastPasser >= 0 && this.lastPasser !== s && this.on[t][this.lastPasser] >= 0 ? this.lastPasser : -1
     if (assist >= 0) { this.st(t, assist).keyPasses++; this.st(t, assist).xa += xg; this.rate(t, assist, 0.12 + xg * 0.5) }
     this.tick(1.2)
-    const pGoal = clamp(xg * (1.4 + (fin - gk) / 150), 0.005, 0.95)
+    const pGoal = clamp(xg * (1.52 + (fin - gk) / 150), 0.005, 0.95)
     const pOn = clamp(Math.max(pGoal + 0.03, 0.4 + (fin - 62) / 170 - pressure * 0.12 + (dist < 11 ? 0.12 : 0) - (header ? 0.05 : 0)), 0, 0.92)
     const pBlock = kind === 'pen' ? 0 : clamp(0.1 + pressure * 0.26 + (dist > 18 ? 0.06 : 0), 0, 0.42)
     const gx = this.wx(t, 1)
@@ -750,7 +751,7 @@ export class MatchSim {
         this.ev('yellow', o, `Yellow card for ${dp.short}.`, { p: dp.id })
       }
     }
-    if (inBox && this.rng.chance(0.42)) {
+    if (inBox && this.rng.chance(0.2)) {
       this.ev('foul', o, `Penalty to ${this.teams[t].short}! ${dp.short} brings down ${this.name(t, s)}.`, { p: dp.id })
       this.poss = t
       this.restart = 'penalty'
@@ -804,7 +805,7 @@ export class MatchSim {
     const tac = this.teams[t].tactic
     this.poss = t
     this.lastPasser = -1
-    if (fromFoul && d < 30 && Math.abs(ny - 0.5) < 0.3 && nx < 0.84) {
+    if (fromFoul && d < 25 && Math.abs(ny - 0.5) < 0.2 && nx < 0.84) {
       const k = this.bestAt(t, A.setPieces, tac.freeKicks)
       const g = this.gi(t, k)
       this.px[g] = x; this.py[g] = y
