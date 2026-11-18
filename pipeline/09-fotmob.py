@@ -45,9 +45,9 @@ fm_teams = {}
 def add_team(tid):
     d = js(f'https://www.fotmob.com/api/data/teams?id={tid}', f'team-{tid}.json')
     if not d: return
-    for g in (d.get('squad') or {}).get('squad', []):
+    for g in ((d.get('squad') or {}).get('squad') or []):
         if g.get('title') == 'coach': continue
-        for m in g.get('members', []): fm_players[m['id']] = (m['name'], m.get('dateOfBirth'), (d.get('details') or {}).get('name', ''))
+        for m in (g.get('members') or []): fm_players[m['id']] = (m['name'], m.get('dateOfBirth'), (d.get('details') or {}).get('name', ''))
 
 # Iranian leagues: find league ids through search, then every club squad
 league_ids = {523}
