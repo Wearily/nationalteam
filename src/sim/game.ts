@@ -2,7 +2,7 @@ import { fmtDay, toDay, ymd, type Day } from './core/date'
 import { Rng, clamp } from './core/rng'
 import { A, fitToOverall, overallAt } from './ratings/attributes'
 import { mergeExtra, type RawData, type RawExtra } from './data/raw'
-import { campLift, developAll, revalue, reviewPotential, seasonRollover } from './career/develop'
+import { campLift, developAll, matchLift, revalue, reviewPotential, seasonRollover } from './career/develop'
 import { seasonYearFor, simClubFixture, startLeagueSeason } from './clubs/season'
 import { transferWeek } from './clubs/transfers'
 import { progress } from './comps/engine'
@@ -462,6 +462,7 @@ export class Game {
     const ko = comp.stages[f.stage].type === 'ko'
     const level = (parseRef(f.home) as { level: Level }).level
     const competitive = !comp.friendly
+    const grew: Player[] = []
     for (const t of [0, 1] as const) {
       sim.ps[t].forEach((st, i) => {
         if (!st.played) return
@@ -473,6 +474,10 @@ export class Game {
         if (level === 'senior') { p.caps++; p.goals += st.goals; if (competitive) p.capTied = true } else p.youthCaps[level] = (p.youthCaps[level] ?? 0) + 1
         p.cond = clamp(sim.energy[t][i] - 10 - (st.mins / 90) * 8, 30, 100)
         p.sharp = Math.min(100, p.sharp + (st.mins / 90) * 8)
+        // minutes against better opposition bring a young player on a little
+        const oppCode = parseRefCode(t === 0 ? f.away : f.home)
+        const oppLevel = (w.nations[oppCode]?.level ?? 60) - (level === 'senior' ? 0 : ({ u23: 8, u21: 11, u20: 13, u19: 16, u17: 21, u16: 24, u15: 27 } as Record<string, number>)[level] ?? 0)
+        if (matchLift(this.rng, p, f.day, oppLevel, st.mins, st.rating, competitive) && p.nat[0] === 'IRN') grew.push(p)
         // tournament football is a shop window: standout displays put a player on foreign clubs' radar
         if (competitive && st.mins >= 45) {
           const stage = comp.weight >= 50 ? 1.6 : comp.weight >= 35 ? 1.2 : comp.weight >= 25 ? 0.5 : level === 'senior' ? 0.3 : 0.45
@@ -487,6 +492,10 @@ export class Game {
         if (st.mins >= 20) { p.form.push(st.rating); if (p.form.length > 8) p.form.shift() }
         if (p.nat[0] === 'IRN') { p.morale = clamp(p.morale + (st.rating - 6.6) * 4, 0, 100); p.known = Math.min(100, p.known + 10 + (st.mins / 90) * 20) }
       })
+    }
+    if (grew.length && (level === 'senior' || w.teams[level]?.control === 'manual')) {
+      const opp = teamName(w, f.home.startsWith('n:IRN:') ? f.away : f.home).name
+      this.news('form', `${grew.map((x) => x.name).join(', ')} ${grew.length === 1 ? 'looks' : 'look'} to have grown from the experience of facing ${opp}.`, grew[0].id)
     }
     for (const [t, id] of sim.injured) {
       const p = w.players[id]

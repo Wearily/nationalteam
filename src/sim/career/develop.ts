@@ -67,6 +67,33 @@ export function campLift(rng: Rng, p: Player, day: Day, squadAvg: number, coachY
 }
 
 /**
+ * Experience from an international. A young player who gets real minutes against opposition better than
+ * he is can take one small step forward, the same size as a camp lift. The chance grows with the minutes,
+ * with how far the opponent stretches him, and when the match is competitive; it shrinks if he was
+ * overwhelmed (a very poor rating teaches less), and it cannot happen more than once every six weeks.
+ * A weak opponent teaches nothing, and nobody over 23 benefits.
+ */
+export function matchLift(rng: Rng, p: Player, day: Day, oppLevel: number, mins: number, rating: number, competitive: boolean): boolean {
+  const age = ageOn(p.dob, day)
+  if (age > 23 || mins < 30 || p.pot - p.ovr < 3) return false
+  if (p.expDay != null && day - p.expDay < 42) return false
+  const stretch = clamp((oppLevel - p.ovr + 2) / 10, 0, 1.2)
+  if (stretch < 0.15) return false
+  const coped = rating >= 6.4 ? 1 : rating >= 5.8 ? 0.7 : 0.4
+  const chance = 0.16 * stretch * clamp(mins / 75, 0.4, 1.1) * coped * (age <= 18 ? 1.2 : age <= 21 ? 1 : 0.6) * (competitive ? 1.3 : 1) * (0.75 + p.traits.professionalism / 40)
+  if (!rng.chance(Math.min(0.3, chance))) return false
+  const w8 = POS_WEIGHTS[p.pos[0]]
+  for (let i = 0; i < N_ATTR; i++) {
+    const k = ATTRS[i]
+    const mental = i >= A.decisions && i <= A.teamwork
+    if (rng.chance((mental ? 0.3 : 0.14) + ((w8[k] as number) ?? 0) * 0.04)) p.attrs[i] = clamp(p.attrs[i] + 1, 5, 99)
+  }
+  p.ovr = Math.min(p.pot, overallAt(p.attrs, p.pos[0]))
+  p.expDay = day
+  return true
+}
+
+/**
  * Potential is an estimate, and sustained evidence moves it. Checked monthly.
  *
  * A rise needs all of: a young player (24 or under; a narrow late-bloomer window to 27), a proper run of

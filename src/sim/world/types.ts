@@ -69,6 +69,8 @@ export interface Player {
   /** Net potential points gained through breakouts, and the day of the last revision. */
   potUp?: number
   potDay?: Day
+  /** Day of the last development lift from international match experience. */
+  expDay?: Day
   /** Day of the last development lift from a national-team camp. */
   campDay?: Day
   /** Shop-window effect: recent standout tournament performances that put him on foreign clubs' radar (0–10, fades monthly). */
