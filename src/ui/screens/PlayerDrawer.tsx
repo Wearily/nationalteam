@@ -118,7 +118,7 @@ export function PlayerProfile({ id }: { id: number }) {
             <div className="kv"><span>Born</span><b>{world.nations[p.born ?? p.nat[0]]?.name ?? '–'}</b></div>
             <div className="kv"><span>Status</span><b>{p.real ? 'Real player' : 'Generated'}</b></div>
           </div>
-          {!v.exact && <div className="card" style={{ marginTop: 24 }}><b>Ratings are estimates</b><div className="muted" style={{ fontSize: 13.5, margin: '3px 0 10px' }}>Your scouts do not know this player well yet, so overall and potential are shown as ranges. Assign a scout to his region under Recruitment.</div><Meter v={p.known} tone="amber" /></div>}
+          {!v.exact && <div className="card" style={{ marginTop: 24 }}><b>Ratings are estimates</b><div className="muted" style={{ fontSize: 13.5, margin: '3px 0 10px' }}>Your scouts do not know this player well yet, so overall and potential are shown as ranges. Assign a scout to his region under Recruitment, or call him up: a camp and minutes on the pitch reveal a player quickly.</div><Meter v={p.known} tone="amber" /></div>}
           {dual && (
             <div className="card col" style={{ marginTop: 24 }}>
               <div className="row"><h3>Ask him to represent Iran</h3><span className="muted right">Interest: {v.attrs ? ((p.willingness ?? 40) > 60 ? 'warm' : (p.willingness ?? 40) > 35 ? 'open' : 'cool') : 'unknown'}</span></div>

@@ -165,6 +165,8 @@ export class Game {
     const team = w.teams[level]
     team.squad = [...ids]
     camp.announced = true
+    // time in camp with the coaches tells you a lot about a player
+    for (const id of ids) { const pl = w.players[id]; pl.known = Math.min(100, Math.max(pl.known + 20, 65)) }
     const set = new Set(ids)
     // reactions: debutants delighted, established players left out unhappy
     const pool = eligible(w, this.idx, 'IRN', level, w.day).filter((p) => !p.injury)
@@ -416,7 +418,7 @@ export class Game {
         if (level === 'senior') { p.caps++; p.goals += st.goals; if (competitive) p.capTied = true } else p.youthCaps[level] = (p.youthCaps[level] ?? 0) + 1
         p.cond = clamp(sim.energy[t][i] - 10 - (st.mins / 90) * 8, 30, 100)
         p.sharp = Math.min(100, p.sharp + (st.mins / 90) * 8)
-        if (p.nat[0] === 'IRN') p.morale = clamp(p.morale + (st.rating - 6.6) * 4, 0, 100)
+        if (p.nat[0] === 'IRN') { p.morale = clamp(p.morale + (st.rating - 6.6) * 4, 0, 100); p.known = Math.min(100, p.known + 10 + (st.mins / 90) * 20) }
       })
     }
     for (const [t, id] of sim.injured) {
