@@ -808,7 +808,10 @@ export class Game {
       }
     }
     if (d === 1) {
-      for (const pl of w.players) if (pl.spotlight) pl.spotlight = pl.spotlight < 0.3 ? 0 : pl.spotlight * 0.85
+      // clubs' interest is spent in transfer windows, not by waiting for one: it fades quickly after a month in
+      // which the window was open (January, July, August) and only slowly in the months between
+      const fade = m === 2 || m === 8 || m === 9 ? 0.72 : 0.95
+      for (const pl of w.players) if (pl.spotlight) pl.spotlight = pl.spotlight < 0.3 ? 0 : pl.spotlight * fade
       developAll(w, this.rng, w.day)
       for (const { player: pl, by } of reviewPotential(w, this.rng, w.day)) {
         if (pl.nat[0] !== 'IRN' || pl.known < 60) continue
