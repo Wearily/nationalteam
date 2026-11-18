@@ -125,17 +125,20 @@ function SlotRow({ level, day, window, nations }: { level: Level; day: number; w
 export function Calendar() {
   const { w, cmd, notify } = useGame()
   const world = w!
-  const [level, setLevel] = useState<'all' | 'senior'>('senior')
-  const fx = useMemo(() => world.fixtures.filter((f) => (level === 'all' ? f.home.startsWith('n:IRN:') || f.away.startsWith('n:IRN:') : f.home === 'n:IRN:senior' || f.away === 'n:IRN:senior') && f.day >= world.day - 120).sort((a, b) => a.day - b.day), [world, level])
+  const [level, setLevel] = useState<'mine' | 'all' | 'senior'>('mine')
+  const managed = Object.values(world.teams).filter((t) => t.control === 'manual').map((t) => t.level)
+  const inScope = (lv: string) => (level === 'all' ? true : level === 'senior' ? lv === 'senior' : managed.length ? managed.includes(lv as Level) : lv === 'senior')
+  const iranLevel = (f: Fixture) => (f.home.startsWith('n:IRN:') ? f.home.split(':')[2] : f.away.startsWith('n:IRN:') ? f.away.split(':')[2] : '')
+  const fx = useMemo(() => world.fixtures.filter((f) => iranLevel(f) && inScope(iranLevel(f)) && f.day >= world.day - 120).sort((a, b) => a.day - b.day), [world, level])
   const months = new Map<string, Fixture[]>()
   for (const f of fx) { const { y, m } = ymd(f.day); const k = `${monthName(m)} ${y}`; (months.get(k) ?? months.set(k, []).get(k)!).push(f) }
   const friendlies = fx.filter((f) => !f.played && world.comps[f.compId].friendly && f.day - world.day >= 10).slice(0, 10)
   const nations = useMemo(() => Object.values(world.nations).filter((n) => n.code !== 'IRN').sort((a, b) => a.rank - b.rank), [world])
-  const slots = useMemo(() => (Object.values(world.teams).filter((t) => t.control === 'manual' && (level === 'all' || t.level === 'senior')).flatMap((t) => openSlots(world, t.level).map((sl) => ({ ...sl, level: t.level })))).sort((x, y) => x.day - y.day), [world, level])
-  const camps = world.camps.filter((c) => !c.done && (level === 'all' || c.level === 'senior')).sort((a, b) => a.from - b.from).slice(0, 6)
+  const slots = useMemo(() => (Object.values(world.teams).filter((t) => t.control === 'manual' && inScope(t.level)).flatMap((t) => openSlots(world, t.level).map((sl) => ({ ...sl, level: t.level })))).sort((x, y) => x.day - y.day), [world, level])
+  const camps = world.camps.filter((c) => !c.done && inScope(c.level)).sort((a, b) => a.from - b.from).slice(0, 6)
   return (
     <div className="page-inner">
-      <div className="seg" style={{ alignSelf: 'flex-start' }}><button className={level === 'senior' ? 'on' : ''} onClick={() => setLevel('senior')}>Senior team</button><button className={level === 'all' ? 'on' : ''} onClick={() => setLevel('all')}>All Iran teams</button></div>
+      <div className="seg" style={{ alignSelf: 'flex-start' }}><button className={level === 'mine' ? 'on' : ''} onClick={() => setLevel('mine')}>Teams you manage{managed.length ? ` (${managed.map((l) => LEVEL_NAME[l]).join(', ')})` : ''}</button><button className={level === 'senior' ? 'on' : ''} onClick={() => setLevel('senior')}>Senior team</button><button className={level === 'all' ? 'on' : ''} onClick={() => setLevel('all')}>All Iran teams</button></div>
       <div className="grid" style={{ alignItems: 'start', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)' }}>
         <div className="col" style={{ gap: 18 }}>
           {[...months.entries()].map(([k, list]) => (

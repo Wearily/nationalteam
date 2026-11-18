@@ -175,7 +175,7 @@ export function aiTactic(w: World, code: string, oppCode: string): Tactic {
 export function buildMTeam(w: World, ref: TeamRef, squad: number[], tactic: Tactic, ai: boolean, autoXI: boolean): MTeam {
   const players = squad.map((id) => w.players[id])
   const tac: Tactic = { ...tactic, roles: [...tactic.roles], lineup: [...tactic.lineup], bench: [...tactic.bench] }
-  const valid = tac.lineup.filter((id) => id >= 0 && squad.includes(id) && !w.players[id].injury).length === 11
+  const valid = tac.lineup.length === 11 && new Set(tac.lineup).size === 11 && tac.lineup.every((id) => id >= 0 && squad.includes(id) && !w.players[id].injury)
   if (autoXI || !valid) {
     const xi = pickXI(players, tac.formation)
     tac.lineup = xi.lineup

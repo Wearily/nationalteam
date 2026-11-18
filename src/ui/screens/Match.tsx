@@ -206,6 +206,10 @@ export function LineupPitch({ title, formation, lineup, ps, names, motm, color }
   const open = useGame((s) => s.openPlayer)
   const slots = FORMATIONS[formation] ?? FORMATIONS['4-3-3']
   const st = new Map(ps.map((p) => [p.id, p]))
+  // older reports can have gaps or repeats in the stored lineup: fill them with the starters left out
+  const seenIds = new Set<number>()
+  const spare = ps.filter((p) => p.played && !p.subOn && !lineup.includes(p.id))
+  lineup = lineup.map((id) => { if (st.has(id) && !seenIds.has(id)) { seenIds.add(id); return id } return -1 }).map((id) => (id >= 0 ? id : spare.shift()?.id ?? -1))
   const subs = ps.filter((p) => p.played && p.subOn).sort((a, b) => (a.subOn ?? 0) - (b.subOn ?? 0))
   const Chip = ({ p }: { p: PStats }) => <span className="lp-rt" style={{ background: ratingColor(p.rating) }}>{p.rating.toFixed(1)}{p.id === motm ? ' ★' : ''}</span>
   const Who = ({ id }: { id: number }) => { const pl = world?.players[id]; return <span className="lp-av">{pl ? <Face p={pl} /> : null}</span> }

@@ -89,6 +89,39 @@ describe('match engine balance', () => {
   })
 })
 
+describe('live match lineup', () => {
+  it('keeps eleven different players on the pitch when the user changes things after the coach has made substitutions', () => {
+    const g = Game.create(synthRaw(), 21, 'T', {}, null)
+    for (const t of Object.values(g.w.teams)) t.control = 'auto'
+    g.w.teams.senior.control = 'manual'
+    let r = g.advance(400)
+    while (r.stop !== 'match') {
+      if (r.stop === 'squad') g.announceSquad('senior', g.suggestSquad('senior', g.w.camps.find((c) => c.id === r.campId)!.size), false)
+      r = g.advance(400)
+    }
+    const f = g.w.fixtures.find((x) => x.id === r.fixtureId)!
+    const side = f.home.startsWith('n:IRN') ? 0 : 1
+    let ch = g.liveStart(f.id)
+    if (typeof ch === 'string') throw new Error(ch)
+    g.liveCoach(true)
+    while (!ch.snap.done && ch.snap.subsLeft[side] > 2) ch = g.liveStep(50)
+    g.liveCoach(false)
+    // the screen sends back the lineup it was given, with two players swapped and a new shape
+    const tac = { ...ch.snap.tactics[side], lineup: [...ch.snap.tactics[side].lineup], formation: '4-4-2' }
+    ;[tac.lineup[2], tac.lineup[7]] = [tac.lineup[7], tac.lineup[2]]
+    g.liveTactic(tac)
+    ch = g.liveStep(10)
+    const reds = ch.snap.players[side].filter((p) => p.red).length
+    const on = ch.snap.on[side].filter((i) => i >= 0)
+    expect(new Set(on).size).toBe(on.length)
+    expect(on.length).toBeGreaterThanOrEqual(10 - reds)
+    const rid = g.liveFinish()
+    const rep = g.w.reports.find((x) => x.id === rid)!
+    expect(new Set(rep.lineups[side]).size).toBe(11)
+    for (const id of rep.lineups[side]) expect(rep.players[side].some((p) => p.id === id && p.played && !p.subOn)).toBe(true)
+  })
+})
+
 describe('career', () => {
   it('runs 500 days headless, completes the Asian Cup, and survives a save round-trip', () => {
     const g = Game.create(synthRaw(), 42, 'Test')

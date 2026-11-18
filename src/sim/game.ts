@@ -15,7 +15,7 @@ import type { Tactic } from './match/tactics'
 import type { Frame, MatchReport, MatchSnapshot, MEvent, ShotRec } from './match/types'
 import { buildWorld } from './world/build'
 import { buildIndex, type Camp, type Index, type Message, type NewsItem, type ScoutScope, type World } from './world/state'
-import { LEVEL_NAME, natRef, parseRef, type Fixture, type Level, type Player, type Pos } from './world/types'
+import { LEVEL_NAME, LEVELS, natRef, parseRef, type Fixture, type Level, type Player, type Pos } from './world/types'
 
 export interface AdvanceResult {
   stop: 'squad' | 'match' | 'days' | 'news'
@@ -165,11 +165,26 @@ export class Game {
     for (const id of prev) {
       const p = w.players[id]
       if (!p) continue
-      const why = !ok.has(id) ? (p.intlRetired ? 'retired from internationals' : p.retired ? 'retired' : 'no longer eligible') : p.injury && p.injury.until > (camp?.first ?? w.day) + 10 ? 'injured' : taken.has(id) ? 'with another Iran squad' : null
+      const why = !ok.has(id) ? (p.intlRetired ? 'retired from internationals' : p.retired ? 'retired' : 'no longer eligible') : p.injury && p.injury.until > (camp?.first ?? w.day) + 10 ? 'injured' : this.squadOf(id, level) && LEVELS.indexOf(this.squadOf(id, level)!) < LEVELS.indexOf(level) ? `with the ${LEVEL_NAME[this.squadOf(id, level)!]} squad` : null
       if (why) dropped.push(`${p.name} (${why})`)
       else ids.push(id)
     }
     return { ids: ids.slice(0, camp?.size ?? 26), dropped }
+  }
+  /** The other Iran squad a player is currently called up to, if any. */
+  squadOf(id: number, not?: Level): Level | null {
+    for (const l of LEVELS) if (l !== not && this.w.teams[l]?.squad.includes(id)) return l
+    return null
+  }
+  /** A player is only ever in one Iran squad: the older age group keeps him. */
+  dedupeSquads() {
+    const seen = new Set<number>()
+    for (const l of LEVELS) {
+      const t = this.w.teams[l]
+      if (!t) continue
+      t.squad = t.squad.filter((id) => !seen.has(id))
+      for (const id of t.squad) seen.add(id)
+    }
   }
   validateSquad(level: Level, ids: number[], camp: Camp): string | null {
     if (ids.length > camp.size) return `Too many players: ${ids.length} selected, the limit is ${camp.size}.`
@@ -179,6 +194,8 @@ export class Game {
       const p = this.w.players[id]
       if (!el.has(id)) return `${p.name} is not eligible for the ${LEVEL_NAME[level]} team.`
       if (p.injury && p.injury.until > camp.first + 10) return `${p.name} is injured until ${fmtDay(p.injury.until)}.`
+      const other = this.squadOf(id, level)
+      if (other && LEVELS.indexOf(other) < LEVELS.indexOf(level)) return `${p.name} is with the ${LEVEL_NAME[other]} squad, which has first call on him.`
     }
     if (ids.filter((id) => this.w.players[id].pos[0] === 'GK').length < 2) return 'Select at least two goalkeepers.'
     return null
@@ -193,6 +210,16 @@ export class Game {
     team.squad = [...ids]
     team.lastSquad = [...ids]
     camp.announced = true
+    // the older age group has first call: anyone promoted leaves the younger squad he was in
+    const mine = new Set(ids)
+    for (const l of LEVELS) {
+      const t = w.teams[l]
+      if (!t || l === level || LEVELS.indexOf(l) < LEVELS.indexOf(level)) continue
+      const gone = t.squad.filter((id) => mine.has(id))
+      if (!gone.length) continue
+      t.squad = t.squad.filter((id) => !mine.has(id))
+      if (t.control === 'manual') this.msg('squad', `${gone.length} player${gone.length === 1 ? '' : 's'} moved up from the ${LEVEL_NAME[l]} squad`, `${gone.map((id) => w.players[id].name).join(', ')} ${gone.length === 1 ? 'has' : 'have'} been called up by the ${LEVEL_NAME[level]} team and ${gone.length === 1 ? 'leaves' : 'leave'} the ${LEVEL_NAME[l]} squad. You can name replacements from the Call-up tab.`, false, `team:${l}`)
+    }
     // time in camp with the coaches tells you a lot about a player
     for (const id of ids) { const pl = w.players[id]; pl.known = Math.min(100, Math.max(pl.known + 20, 65)) }
     const set = new Set(ids)
@@ -518,10 +545,10 @@ export class Game {
       for (const t of [0, 1] as const) for (const st of sim.ps[t]) if (st.played && st.rating > best) { best = st.rating; motm = st.id }
       const rep: MatchReport = {
         id: w.nextId.report++, fixtureId: f.id,
-        home: { ref: f.home, name: sim.teams[0].name, short: sim.teams[0].short, colors: sim.teams[0].colors, formation: sim.teams[0].tactic.formation },
-        away: { ref: f.away, name: sim.teams[1].name, short: sim.teams[1].short, colors: sim.teams[1].colors, formation: sim.teams[1].tactic.formation },
+        home: { ref: f.home, name: sim.teams[0].name, short: sim.teams[0].short, colors: sim.teams[0].colors, formation: sim.startFormation[0] },
+        away: { ref: f.away, name: sim.teams[1].name, short: sim.teams[1].short, colors: sim.teams[1].colors, formation: sim.startFormation[1] },
         score: [f.hg, f.ag], pens: f.pens, et: !!f.et, stats: sim.snapshot().stats, players: sim.ps, names, events: sim.events, shots: sim.shots, momentum: sim.momentum,
-        lineups: [sim.teams[0].tactic.lineup, sim.teams[1].tactic.lineup], motm,
+        lineups: sim.startXI, motm,
       }
       w.reports.push(rep)
       if (w.reports.length > 80) w.reports.shift()
@@ -575,6 +602,9 @@ export class Game {
     const team = w.teams[comp.level]
     this.msg('match', `Iran out of the ${comp.name}`, `The ${LEVEL_NAME[comp.level]} team's tournament ends at the ${stage.toLowerCase()}.`, true, `comp:${comp.id}`)
     w.history.push({ year: comp.season, comp: comp.name, level: comp.level, result: stage })
+    // beaten semi-finalists still have the third-place play-off: the squad stays until that is played
+    const ref = natRef('IRN', comp.level)
+    if (w.fixtures.some((f) => f.compId === comp.id && !f.played && (f.home === ref || f.away === ref))) return
     team.squad = []
     for (const c of w.camps) if (c.level === comp.level && c.compId === comp.id) c.done = true
   }
@@ -722,7 +752,10 @@ export class Game {
     if (!comp || comp.friendly || comp.done) return false
     const st0 = comp.stages[0]
     if (!st0.neutral) return false // home-and-away qualifying is played window by window, not as one camp
-    return !comp.placings?.[natRef('IRN', c.level)]
+    const ref = natRef('IRN', c.level)
+    // still a match to come (a third-place play-off counts) or not yet knocked out
+    if (this.w.fixtures.some((f) => f.compId === comp.id && !f.played && (f.home === ref || f.away === ref))) return true
+    return !comp.placings?.[ref]
   }
   /**
    * Repair for careers saved before tournament squads were kept between rounds: if a squad is being asked
@@ -731,6 +764,7 @@ export class Game {
    */
   restoreTournamentSquads() {
     const w = this.w
+    this.dedupeSquads()
     rebuildCamps(w) // also separates a finals squad from one named for a warm-up friendly
     for (const c of w.camps) {
       if (c.done || c.announced) continue

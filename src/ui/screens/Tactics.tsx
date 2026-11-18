@@ -32,7 +32,9 @@ export function TacticsEditor({ tactic, squad, onChange, energy, locked, compact
   const set = (patch: Partial<Tactic>) => onChange({ ...tactic, ...patch })
   const changeFormation = (f: string) => {
     const xi = pickXI(tactic.lineup.map((id) => byId.get(id)).filter(Boolean) as Player[], f)
-    const lineup = xi.lineup.map((id, i) => (id >= 0 ? id : (xi.bench.shift() ?? tactic.lineup[i])))
+    // anyone the new shape has no natural place for (and anyone not in the squad list) fills the gaps: never a duplicate
+    const spare = tactic.lineup.filter((id) => !xi.lineup.includes(id))
+    const lineup = xi.lineup.map((id) => (id >= 0 ? id : (spare.shift() ?? -1)))
     setSel(null)
     onChange({ ...tactic, formation: f, lineup, roles: FORMATIONS[f].map((s) => defaultRole(s.pos)) })
   }

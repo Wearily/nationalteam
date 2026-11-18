@@ -95,6 +95,8 @@ export class MatchSim {
     this.energy = [home.players.map((p) => p.cond), away.players.map((p) => p.cond)]
     this.ps = [home.players.map((p) => newP(p.id)), away.players.map((p) => newP(p.id))]
     this.dayBoost = [[], []]
+    this.startXI = [[...home.tactic.lineup], [...away.tactic.lineup]]
+    this.startFormation = [home.tactic.formation, away.tactic.formation]
     for (const t of [0, 1] as const) {
       const team = this.teams[t]
       this.on[t] = team.tactic.lineup.map((id) => team.players.findIndex((p) => p.id === id))
@@ -846,6 +848,9 @@ export class MatchSim {
     }
   }
   injured: [number, number][] = []
+  /** The elevens and shapes that kicked off, for the match report. */
+  startXI: [number[], number[]] = [[], []]
+  startFormation: [string, string] = ['', '']
   private forceSub(t: 0 | 1, s: number) {
     if (this.subsUsed[t] < this.opts.subs) {
       const b = this.pickBench(t, s)
@@ -1069,6 +1074,10 @@ export class MatchSim {
     this.st(t, s).on = false
     this.st(t, s).subOff = min
     this.on[t][s] = benchIdx
+    // the tactic's lineup always mirrors who is on the pitch
+    const lu = [...this.teams[t].tactic.lineup]
+    lu[s] = inn.id
+    this.teams[t].tactic = { ...this.teams[t].tactic, lineup: lu }
     this.ps[t][benchIdx].on = true
     this.ps[t][benchIdx].played = true
     this.ps[t][benchIdx].subOn = min
@@ -1091,15 +1100,25 @@ export class MatchSim {
   /** Swap two on-pitch players' slots, or change sliders / formation / roles. */
   setTactic(t: 0 | 1, tac: Tactic) {
     const team = this.teams[t]
-    const cur = this.on[t].map((i) => (i >= 0 ? team.players[i].id : -1))
-    // keep the same eleven; reorder according to the new lineup where ids match
-    const next = tac.lineup.map((id) => (cur.includes(id) ? team.players.findIndex((p) => p.id === id) : -1))
-    const missing = cur.filter((id) => id >= 0 && !tac.lineup.includes(id))
-    for (let s = 0; s < 11 && missing.length; s++) if (next[s] < 0) next[s] = team.players.findIndex((p) => p.id === missing.shift())
-    const count = this.on[t].filter((i) => i >= 0).length
-    // respect dismissals: never field more than are currently on
-    let extra = next.filter((i) => i >= 0).length - count
-    for (let s = 10; s > 0 && extra > 0; s--) if (next[s] >= 0 && !cur.includes(team.players[next[s]].id)) { next[s] = -1; extra-- }
+    // keep exactly the players who are on the pitch: put each where the new lineup wants him (once),
+    // then drop anyone the lineup left out into the remaining slots. Slots stay empty only for
+    // players who have been sent off or gone off injured without a replacement.
+    const left = new Set(this.on[t].filter((i) => i >= 0))
+    const next: number[] = tac.lineup.slice(0, 11).map((id) => {
+      const i = id >= 0 ? team.players.findIndex((p) => p.id === id) : -1
+      if (i < 0 || !left.has(i)) return -1
+      left.delete(i)
+      return i
+    })
+    while (next.length < 11) next.push(-1)
+    // the goalkeeper's slot is filled first
+    for (const s of [0, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1]) {
+      if (!left.size) break
+      if (next[s] >= 0) continue
+      const i = left.values().next().value as number
+      left.delete(i)
+      next[s] = i
+    }
     team.tactic = { ...tac, lineup: next.map((i) => (i >= 0 ? team.players[i].id : -1)) }
     this.on[t] = next
     this.applyTactic(t)
