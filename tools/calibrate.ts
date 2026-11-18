@@ -56,4 +56,11 @@ if (process.argv[1]?.endsWith('calibrate.ts')) {
   console.log(`yellows ${per('yellows')} [3.2-4.6]  reds ${per('reds')} [0.1-0.25]  tackles won ${per('tackles')}  injuries ${per('inj')}  possH ${per('possH')}`)
   console.log(`H ${(hw / N * 100).toFixed(0)}%  D ${(d / N * 100).toFixed(0)}%  A ${(aw / N * 100).toFixed(0)}%   avg rating ${(acc.rating / N / 2).toFixed(2)} max ${(acc.ratingMax / N / 2).toFixed(2)} min ${(acc.ratingMin / N / 2).toFixed(2)}`)
   console.log(Object.entries(scores).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([k, v]) => `${k}:${v}`).join(' '))
+  void import('./shotshare').then(({ shotShare }) => {
+    const pc = (x: number) => `${Math.round(x * 100)}%`
+    for (const gap of [0, 12]) {
+      const r = shotShare(gap, Math.min(N, 300))
+      console.log(`gap ${gap}: striker ${pc(r.stShots)} of shots [25-40], ${pc(r.stGoals)} of goals [30-45]  hat-trick ${pc(r.hat)}${gap ? '' : ' [<3]'}  5+ by one ${pc(r.five)} [<1]  9.5+ rating ${pc(r.r95)}${gap ? '' : ' [<8]'}`)
+    }
+  })
 }

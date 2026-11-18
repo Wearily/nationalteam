@@ -7,6 +7,7 @@ import { MatchSim } from '../src/sim/match/engine'
 import { generateAttrs, overallAt, POS_LIST } from '../src/sim/ratings/attributes'
 import type { Fixture } from '../src/sim/world/types'
 import { synthTeam } from '../tools/calibrate'
+import { shotShare } from '../tools/shotshare'
 import { synthRaw } from '../tools/synthRaw'
 
 const fx = (home: string, away: string, hg: number, ag: number): Fixture => ({ id: 0, day: 0, compId: 0, stage: 0, home, away, played: true, hg, ag })
@@ -72,6 +73,19 @@ describe('match engine', () => {
     }
     expect(a.done).toBe(true)
     expect(a.score[0] !== a.score[1] || !!a.pens).toBe(true)
+  })
+})
+
+describe('match engine balance', () => {
+  it('spreads shots and goals around the team instead of funnelling them to the striker', () => {
+    const r = shotShare(0, 150)
+    expect(r.stShots).toBeGreaterThan(0.2)
+    expect(r.stShots).toBeLessThan(0.45)
+    expect(r.stGoals).toBeLessThan(0.52)
+    expect(r.hat).toBeLessThan(0.08)
+    expect(r.five).toBeLessThan(0.02)
+    expect(r.matchGoals).toBeGreaterThan(2.1)
+    expect(r.matchGoals).toBeLessThan(3.2)
   })
 })
 

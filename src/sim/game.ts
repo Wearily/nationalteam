@@ -731,6 +731,7 @@ export class Game {
    */
   restoreTournamentSquads() {
     const w = this.w
+    rebuildCamps(w) // also separates a finals squad from one named for a warm-up friendly
     for (const c of w.camps) {
       if (c.done || c.announced) continue
       const comp = w.comps[c.compId]
@@ -825,7 +826,9 @@ export class Game {
         this.news('form', `${pl.name}'s run of form at ${club} has the scouts revising his ceiling upward (+${by} potential, now ${pl.pot}).`, pl.id)
         if (pl.pot >= 78) this.msg('scout', `${pl.name} is developing faster than expected`, `After a sustained run of performances for ${club}, our assessment of ${pl.name} (${Math.floor((w.day - pl.dob) / 365.25)}, ${pl.pos[0]}) has gone up. His potential is now rated ${pl.pot}.`, false, `player:${pl.id}`)
       }
-      revalue(w, w.day)
+      const eur = (v: number) => (v >= 1e6 ? `€${(v / 1e6).toFixed(1)}m` : `€${Math.round(v / 1000)}k`)
+      for (const { p, from } of revalue(w, w.day).sort((a, b) => b.p.value - a.p.value).slice(0, 3))
+        this.news('form', `${p.name}'s market value is up from ${eur(from)} to ${eur(p.value)}${(p.spotlight ?? 0) >= 2 ? ' after his displays for Iran' : ''}.`, p.id)
       rerank(w)
       w.rankHist.push([w.day, w.nations.IRN.rank])
       this.finance()

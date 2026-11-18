@@ -41,6 +41,7 @@ const SUB_MARKS = [58, 68, 76, 84, 96, 106]
 
 type Restart = 'kickoff' | 'goalkick' | 'corner' | 'freekick' | 'throw' | 'penalty' | null
 
+const LONG = 0.12
 export class MatchSim {
   teams: [MTeam, MTeam]
   opts: MatchOpts
@@ -230,8 +231,15 @@ export class MatchSim {
       const w = 0.72 + 0.5 * (tac.width / 100)
       y = 0.5 + (sl.y - 0.5) * w + (bny - 0.5) * 0.2
       if (role.inside) y += (0.5 - y) * clamp((role.inside / 34) * (0.4 + bnx), -0.3, 0.8)
-      // attackers make runs when the ball is in the final third
-      if (sl.x > 0.6 && bnx > 0.6) x += 0.05
+      // in the final third the supporting cast arrives as well: wingers attack the far post, attacking
+      // midfielders and runners from midfield get into and around the box, while the striker holds his line
+      if (bnx > 0.6) {
+        const push = (bnx - 0.6) * 2.5 // 0 at the edge of the final third, 1 near the byline
+        if (sl.pos === 'ST') x += 0.03
+        else if (sl.pos === 'RW' || sl.pos === 'LW') { x += 0.07 + 0.07 * push; y += (0.5 - y) * 0.45 * push * (Math.abs(bny - sl.y) > 0.4 ? 1.4 : 0.7) }
+        else if (sl.pos === 'AM') x += 0.08 + 0.06 * push
+        else if (sl.pos === 'CM') x += (0.035 + 0.05 * push) * (0.6 + ment * 0.8) * (role.fwd > 3 ? 1.5 : role.fwd < 0 ? 0.4 : 1)
+      }
     } else {
       const line = tac.line / 100
       x = sl.x * (0.5 + 0.22 * line) + bnx * 0.36 - 0.03
@@ -353,6 +361,7 @@ export class MatchSim {
     const near = this.nearestOpp(t, this.bx, this.by, true)
     const pressure = clamp(1 - near.d / 7, 0, 1)
     const role = this.roles[t][s]
+    const sl0 = this.slots[t][s]
 
     // defender challenges the carrier
     const otac = this.teams[o].tactic
@@ -361,7 +370,7 @@ export class MatchSim {
     }
 
     // ── evaluate options ──
-    type Opt = { u: number; kind: 'shoot' | 'pass' | 'dribble' | 'cross' | 'clear' | 'hold'; to?: number; lead?: number }
+    type Opt = { u: number; kind: 'shoot' | 'long' | 'pass' | 'dribble' | 'cross' | 'clear' | 'hold'; to?: number; lead?: number }
     const opts: Opt[] = [{ u: 0.012 + (tac.timeWasting / 100) * 0.02, kind: 'hold' }]
     const gdx = (1 - nx) * PL
     const gdy = (ny - 0.5) * PW
@@ -371,7 +380,10 @@ export class MatchSim {
     if (gd < 27 && s !== 0) {
       const xg = xgModel(gd, Math.abs(gdy), pressure, false)
       const skill = (this.at(t, s, A.finishing) + (gd > 18 ? this.at(t, s, A.longShots) : this.at(t, s, A.composure))) / 2
-      opts.push({ u: xg * (1.35 + skill / 120) * role.shoot * (gd > 19 ? 0.5 : gd > 14 ? 0.8 : 1.0) + (gd < 9 ? 0.2 : 0), kind: 'shoot' })
+      opts.push({ u: xg * (1.6 + skill / 120) * role.shoot * (gd > 19 ? clamp(0.5 + (this.at(t, s, A.longShots) - 58) / 70, 0.35, 1.0) : gd > 14 ? 0.85 : 1.0) + (gd < 9 ? 0.2 : 0), kind: 'shoot' })
+      // with a sight of goal and room to hit it, players have a go: most shots outside the box come from
+      // midfielders and wide players, not the striker
+      if (gd > 15 && pressure < 0.55 && Math.abs(gdy) < 17 && this.rng.chance((LONG + (this.at(t, s, A.longShots) - 55) / 400) * role.shoot * (1 - pressure) * (sl0.pos === 'ST' ? 0.5 : sl0.pos === 'CB' || sl0.pos === 'RB' || sl0.pos === 'LB' ? 0.45 : 1) * (0.75 + ment * 0.5))) opts.push({ u: 1.2, kind: 'long' })
     }
     const direct = tac.directness / 100
     const passSkill = this.at(t, s, A.passing) * 0.6 + this.at(t, s, A.vision) * 0.2 + this.at(t, s, A.technique) * 0.2
@@ -389,6 +401,8 @@ export class MatchSim {
       const gain = threat(rnx, rny) - here
       let u = ps * (0.05 + threat(rnx, rny) * 1.0 + Math.max(0, gain) * (1.1 + ment * 0.9)) - (1 - ps) * (0.035 + here * 0.5 + (nx < 0.35 ? 0.1 : 0)) * (2.05 - ment * 0.5 - role.risk * 0.55)
       if (fwd < -0.02) u *= 0.6 + (1 - ment) * 0.3 + pressure * 0.25
+      if (rnx > 0.72 && open > 3.5 && j !== 0) u += ps * 0.035 * Math.min(1, (open - 3.5) / 4) // the free man around the box
+      if (open < 2.2) u *= 0.72 // a tightly marked team-mate is a poor option: look for the free man
       if (d > 30) u *= 0.55 + direct * 0.8 + (this.roles[t][j].target - 1) * 0.3
       opts.push({ u, kind: 'pass', to: j })
     }
@@ -398,7 +412,7 @@ export class MatchSim {
       if (nx > 0.7 && Math.abs(ny - 0.5) > 0.22) opts.push({ u: 0.05 * role.cross * (0.5 + this.at(t, s, A.crossing) / 100) * (nx > 0.82 ? 1.4 : 1), kind: 'cross' })
       if (nx < 0.3 && pressure > 0.55) opts.push({ u: 0.035 + pressure * 0.04 * (1.4 - ment), kind: 'clear' })
     }
-    const temp = 0.05 - (this.at(t, s, A.decisions) / 99) * 0.03
+    const temp = (0.05 - (this.at(t, s, A.decisions) / 99) * 0.03)
     const pick = this.rng.weighted(opts, (op) => Math.exp(clamp(op.u, -0.5, 1.2) / temp))
 
     switch (pick.kind) {
@@ -409,6 +423,9 @@ export class MatchSim {
         break
       }
       case 'shoot':
+        this.finishMove(t, s, gd)
+        break
+      case 'long':
         this.shoot(t, s, 'open')
         break
       case 'pass':
@@ -443,6 +460,44 @@ export class MatchSim {
   }
 
   // ───────────────────────── actions ─────────────────────────
+  /**
+   * The end of an attacking move. The player who works the opening is often not the one who finishes it:
+   * he may square it, cut it back or lay it off to a team-mate arriving in support. Who gets the chance
+   * depends on position and role (forwards and attacking midfielders most, midfielders from the edge of
+   * the box, defenders rarely), and the provider is credited with the pass. Otherwise he shoots himself.
+   */
+  private finishMove(t: 0 | 1, s: number, gd: number) {
+    const W: Record<string, number> = { ST: 0.8, RW: 1.0, LW: 1.0, AM: 1.05, CM: 0.6, DM: 0.22, RB: 0.16, LB: 0.16, CB: 0.04, GK: 0 }
+    const mine = this.slots[t][s].pos
+    // a striker in on goal usually shoots; others look for a better-placed team-mate more often
+    const pShare = clamp((mine === 'ST' ? 0.74 : 0.36) + (this.at(t, s, A.teamwork) - 60) / 250 + (this.at(t, s, A.vision) - 60) / 300 - (this.roles[t][s].shoot - 1) * 0.25, 0.1, 0.75)
+    if (!this.rng.chance(pShare)) return this.shoot(t, s, 'open')
+    const cands: number[] = []
+    for (let j = 1; j < 11; j++) if (j !== s && this.on[t][j] >= 0) cands.push(j)
+    if (!cands.length) return this.shoot(t, s, 'open')
+    const j = this.rng.weighted(cands, (c) => W[this.slots[t][c].pos] * this.roles[t][c].shoot * (0.5 + (this.at(t, c, A.offTheBall) + this.at(t, c, A.finishing)) / 240))
+    const g = this.gi(t, s)
+    const gj = this.gi(t, j)
+    const pos = this.slots[t][j].pos
+    const front = pos === 'ST' || pos === 'RW' || pos === 'LW' || pos === 'AM'
+    const nx = this.nx(t, this.px[g])
+    const ny = this.ny(t, this.py[g])
+    // forwards arrive level with the ball in the box; midfielders and defenders meet it further out
+    const rnx = front ? clamp(nx + this.rng.range(-0.02, 0.05), 0.82, 0.95) : clamp(Math.min(nx, 0.82) - this.rng.range(0.03, 0.1), 0.7, 0.84)
+    const rny = clamp(0.5 + (ny - 0.5) * 0.35 + this.rng.normal(0, front ? 0.065 : 0.1), 0.2, 0.8)
+    this.px[gj] = this.wx(t, rnx)
+    this.py[gj] = this.wy(t, rny)
+    const st = this.st(t, s)
+    st.passes++; this.ts[t].passes++
+    st.passesC++; this.ts[t].passesC++
+    this.lastPasser = s
+    this.tick(1.1)
+    this.setCarrier(t, j)
+    this.frame(gj)
+    void gd
+    this.shoot(t, j, 'open')
+  }
+
   private loose(x: number, y: number, pKeep: number, t: 0 | 1) {
     const win = this.rng.chance(pKeep) ? t : ((1 - t) as 0 | 1)
     const s = this.closest(win, x, y, true)
@@ -563,7 +618,8 @@ export class MatchSim {
     const near = this.nearestOpp(t, this.px[g], this.py[g], true)
     const adv = 5 + this.rng.range(0, 6) * (0.6 + this.at(t, s, A.pace) / 150)
     const dir = t === 0 ? 1 : -1
-    const toGoalY = (GOAL_Y - this.py[g]) * (this.nx(t, this.px[g]) > 0.75 ? 0.3 : 0.05)
+    const wide = this.slots[t][s].pos === 'RW' || this.slots[t][s].pos === 'LW'
+    const toGoalY = (GOAL_Y - this.py[g]) * (this.nx(t, this.px[g]) > 0.75 ? 0.3 : 0.05) * (wide ? 1.5 + Math.max(0, this.roles[t][s].inside) / 10 : 1)
     if (near.d < 5.5) {
       st.dribbles++
       if (this.duel(t, s, o, near.s, true)) { this.frame(); return }
@@ -654,7 +710,7 @@ export class MatchSim {
     const assist = this.lastPasser >= 0 && this.lastPasser !== s && this.on[t][this.lastPasser] >= 0 ? this.lastPasser : -1
     if (assist >= 0) { this.st(t, assist).keyPasses++; this.st(t, assist).xa += xg; this.rate(t, assist, 0.12 + xg * 0.5) }
     this.tick(1.2)
-    const pGoal = clamp(xg * (1.52 + (fin - gk) / 150), 0.005, 0.95)
+    const pGoal = clamp(xg * (1.45 + (fin - gk) / 150), 0.005, 0.95)
     const pOn = clamp(Math.max(pGoal + 0.03, 0.4 + (fin - 62) / 170 - pressure * 0.12 + (dist < 11 ? 0.12 : 0) - (header ? 0.05 : 0)), 0, 0.92)
     const pBlock = kind === 'pen' ? 0 : clamp(0.1 + pressure * 0.26 + (dist > 18 ? 0.06 : 0), 0, 0.42)
     const gx = this.wx(t, 1)
@@ -680,7 +736,8 @@ export class MatchSim {
       st.sot++; this.ts[t].sot++
       st.goals++; this.ts[t].goals++
       this.score[t]++
-      this.rate(t, s, 1.0 + (1 - xg) * 0.35)
+      // the first goal makes a match; the third adds less to an already excellent mark
+      this.rate(t, s, (1.0 + (1 - xg) * 0.35) * [1, 0.7, 0.5, 0.35, 0.25][Math.min(4, st.goals - 1)])
       if (assist >= 0) { this.st(t, assist).assists++; this.rate(t, assist, 0.65) }
       for (let k = 0; k < 11; k++) if (this.on[o][k] >= 0) { this.st(o, k).conceded++; this.rate(o, k, k === 0 ? -0.3 : this.slots[o][k].x < 0.3 ? -0.2 : -0.08) }
       for (let k = 0; k < 11; k++) if (this.on[t][k] >= 0 && k !== s) this.rate(t, k, 0.05)
@@ -959,6 +1016,7 @@ export class MatchSim {
           if (line === 'GK' || line === 'CB' || line === 'RB' || line === 'LB') r += 0.5
           else if (line === 'DM') r += 0.25
         }
+        if (r > 8.2) r = 8.2 + (r - 8.2) * 0.56 // the top of the scale is hard to reach
         st.rating = Math.round(clamp(r, 3, 10) * 10) / 10
       }
     }

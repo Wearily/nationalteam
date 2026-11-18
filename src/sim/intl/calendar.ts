@@ -138,14 +138,35 @@ export function rebuildCamps(w: World) {
   for (const level of levels) {
     const ref = natRef('IRN', level)
     const fx = w.fixtures.filter((f) => !f.played && f.day >= w.day && (f.home === ref || f.away === ref)).sort((a, b) => a.day - b.day)
+    // a finals tournament needs its own squad announcement: it never rides on a squad already named for a
+    // warm-up friendly. Cut such a camp back to its friendlies so the tournament gets a fresh selection.
+    const hosted = (c: Comp) => !c.friendly && c.stages[0].neutral
+    for (const c of w.camps) {
+      if (c.level !== level || c.done || !c.announced || !w.comps[c.compId]?.friendly) continue
+      const tf = fx.filter((f) => hosted(w.comps[f.compId]) && f.day >= c.from && f.day <= c.to)
+      if (!tf.length) continue
+      const before = w.fixtures.filter((f) => (f.home === ref || f.away === ref) && w.comps[f.compId].friendly && f.day >= c.from && f.day < tf[0].day)
+      c.to = before.length ? Math.max(...before.map((f) => f.day)) : Math.min(c.first, tf[0].day - 1)
+    }
+    // likewise a tournament camp does not swallow the warm-up friendlies before its first match: they get
+    // their own camp, and the finals squad is named (or named again) once they are out of the way
+    for (const c of w.camps) {
+      const comp = w.comps[c.compId]
+      if (c.level !== level || c.done || !comp || !hosted(comp)) continue
+      if (w.fixtures.some((f) => f.compId === comp.id && f.played && (f.home === ref || f.away === ref))) continue
+      const warm = w.fixtures.filter((f) => (f.home === ref || f.away === ref) && w.comps[f.compId].friendly && f.day >= c.from && f.day < c.first)
+      if (!warm.length) continue
+      c.from = Math.max(...warm.map((f) => f.day)) + 1
+      c.announced = false
+    }
     for (const f of fx) {
       const comp = w.comps[f.compId]
       const tournament = !comp.friendly
-      const hit = w.camps.find((c) => c.level === level && !c.done && f.day >= c.from && f.day <= c.to + (tournament && c.compId === comp.id ? 40 : 6))
+      const hit = w.camps.find((c) => c.level === level && !c.done && f.day >= c.from && f.day <= c.to + (tournament && c.compId === comp.id ? 40 : 6) && !(hosted(comp) && c.compId !== comp.id) && !(comp.friendly && hosted(w.comps[c.compId]) && f.day < c.first))
       if (hit) { hit.to = Math.max(hit.to, f.day); if (tournament && hit.compId !== comp.id && !hit.announced) { hit.compId = comp.id; hit.size = comp.squadSize; hit.label = `${comp.name} squad` } continue }
       const lead = tournament ? 12 : 4
       w.camps.push({
-        id: w.camps.length, level, from: Math.max(w.day, f.day - lead), first: f.day, to: f.day, size: comp.squadSize || 23,
+        id: w.camps.length, level, from: Math.max(w.day, f.day - lead, ...w.camps.filter((c) => c.level === level && !c.done && c.to < f.day).map((c) => c.to + 1)), first: f.day, to: f.day, size: comp.squadSize || 23,
         label: tournament ? `${comp.name} squad` : `${LEVEL_NAME[level]} camp`, compId: comp.id, announced: false, done: false,
       })
     }

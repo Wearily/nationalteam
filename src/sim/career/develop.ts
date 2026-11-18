@@ -163,17 +163,22 @@ export function fadePotential(w: World, rng: Rng, day: Day): Player[] {
   return out
 }
 
-export function revalue(w: World, day: Day) {
+/** Monthly market values. Returns known Iranian players whose value jumped by a quarter or more. */
+export function revalue(w: World, day: Day): { p: Player; from: number }[] {
+  const up: { p: Player; from: number }[] = []
   for (const p of w.players) {
     if (p.retired) continue
     const age = ageOn(p.dob, day)
     const formF = p.form.length >= 4 ? 1 + (p.form.reduce((a, b) => a + b, 0) / p.form.length - 6.7) * 0.12 : 1
-    const v = Math.round(valueOf(p.ovr, p.pot, age, leagueStrengthOf(w, p)) * clamp(formF, 0.8, 1.3) * (1 + Math.min(0.25, p.caps / 200)))
+    const v = Math.round(valueOf(p.ovr, p.pot, age, leagueStrengthOf(w, p)) * clamp(formF, 0.8, 1.3) * (1 + Math.min(0.25, p.caps / 200)) * (1 + Math.min(0.3, (p.spotlight ?? 0) * 0.05)))
+    const was = p.value
     p.value = Math.round((p.value * 0.6 + v * 0.4) / 5000) * 5000
+    if (was >= 200_000 && p.value >= was * 1.25 && p.nat[0] === 'IRN' && p.known >= 50) up.push({ p, from: was })
     p.wage = wageOf(p.value)
     const last = p.valueHist[p.valueHist.length - 1]
     if (!last || day - last[0] >= 85) { p.valueHist.push([day, p.value]); if (p.valueHist.length > 40) p.valueHist.shift() }
   }
+  return up
 }
 
 /** 1 July: archive the season, retire veterans, promote a new academy intake. */

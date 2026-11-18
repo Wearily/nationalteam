@@ -1,5 +1,6 @@
 import { ageOn, toDay, ymd, type Day } from '../core/date'
 import { clamp, type Rng } from '../core/rng'
+import { dynOvr } from '../ratings/dynamic'
 import { clubBase } from '../world/build'
 import type { World } from '../world/state'
 import type { Club, Player } from '../world/types'
@@ -22,12 +23,15 @@ export function move(_w: World, p: Player, to: Club, fee: number, day: Day) {
 }
 
 function destination(w: World, rng: Rng, p: Player, abroad: boolean, minLevel = 0): Club | null {
+  // clubs judge him on current standing: a player in form and in the shop window after standout
+  // internationals is in range for clubs a few points stronger than his baseline would attract
+  const seen = p.ovr + Math.min(3, (p.spotlight ?? 0) * 0.4) + clamp(dynOvr(p).form, 0, 2)
   const cands = w.clubs.filter((c) => {
     const lg = w.leagues[c.leagueId]
     if (lg.virtual || c.id === p.clubId) return false
     if (abroad ? c.country === 'IRN' : c.country !== 'IRN') return false
     const base = c.full ? c.str : clubBase(lg.strength, c.rep)
-    return base >= minLevel && p.ovr >= base - 3.5 && p.ovr <= base + 7
+    return base >= minLevel && seen >= base - 3.5 && p.ovr <= base + 7
   })
   if (!cands.length) return null
   return rng.weighted(cands, (c) => (abroad ? (AFFINITY[c.country] ?? 0.3) : 1) * (0.5 + c.rep / 100))
@@ -67,7 +71,7 @@ export function transferWeek(w: World, rng: Rng, day: Day): Move[] {
     const club = w.clubs[p.clubId]
     const lg = w.leagues[club.leagueId]
     const age = ageOn(p.dob, day)
-    if (age < 17 || p.transfers.some((t) => day - t.day < 300)) continue
+    if (age < 17 || p.transfers.some((t) => day - t.day < ((p.spotlight ?? 0) >= 3 ? 150 : 300))) continue
     const here = club.full ? club.str : clubBase(lg.strength, club.rep)
     const k = summer ? 1 : 0.45
     // a player who shone at a tournament is on more clubs' lists, and they pay more for him
