@@ -140,8 +140,15 @@ export class Game {
   suggestSquad(level: Level, size: number): number[] {
     const coach = this.w.teams[level].coachId != null ? this.w.staff[this.w.teams[level].coachId!] : null
     const taken = new Set<number>()
-    // a player can only be in one Iran squad at a time; senior has priority
-    for (const t of Object.values(this.w.teams)) if (t.level !== level) for (const id of t.squad) taken.add(id)
+    // a player can only be in one Iran squad at a time and the older age group has first call: players
+    // with an older squad are off limits; players with a younger squad can be promoted, unless that
+    // side's camp is already under way (a youth tournament squad is not broken up by the coach)
+    for (const t of Object.values(this.w.teams)) {
+      if (t.level === level || !t.squad.length) continue
+      const older = LEVELS.indexOf(t.level) < LEVELS.indexOf(level)
+      const busy = this.w.camps.some((c) => c.level === t.level && c.announced && !c.done && (c.first <= this.w.day || this.inTournament(c)))
+      if (older || busy) for (const id of t.squad) taken.add(id)
+    }
     return pickSquad(this.w, this.idx, this.rng, 'IRN', level, size, this.w.day, coach?.abroadBias ?? 0, taken)
   }
   /** The previous squad for this team, minus anyone who can no longer be picked (retired, too old for the age group, long-term injured). */
@@ -218,6 +225,12 @@ export class Game {
       const gone = t.squad.filter((id) => mine.has(id))
       if (!gone.length) continue
       t.squad = t.squad.filter((id) => !mine.has(id))
+      const tc = w.camps.find((c) => c.level === l && c.announced && !c.done)
+      if (t.control !== 'manual' && tc) {
+        // a coach-run side names replacements straight away
+        for (const id of this.suggestSquad(l, tc.size)) { if (t.squad.length >= tc.size) break; if (!t.squad.includes(id)) t.squad.push(id) }
+        t.lastSquad = [...t.squad]
+      }
       if (t.control === 'manual') this.msg('squad', `${gone.length} player${gone.length === 1 ? '' : 's'} moved up from the ${LEVEL_NAME[l]} squad`, `${gone.map((id) => w.players[id].name).join(', ')} ${gone.length === 1 ? 'has' : 'have'} been called up by the ${LEVEL_NAME[level]} team and ${gone.length === 1 ? 'leaves' : 'leave'} the ${LEVEL_NAME[l]} squad. You can name replacements from the Call-up tab.`, false, `team:${l}`)
     }
     // time in camp with the coaches tells you a lot about a player
@@ -688,10 +701,30 @@ export class Game {
 
   // ───────────────────────── calendar ─────────────────────────
   /** Things that need the user before today can be processed. */
+  /**
+   * Camps that need a squad today, oldest age group first. When a younger side's camp is due and an older
+   * side has a camp overlapping it that is not named yet, the older one is brought forward so it picks first.
+   */
+  private dueCamps(): Camp[] {
+    const w = this.w
+    const rank = (c: Camp) => LEVELS.indexOf(c.level)
+    const open = w.camps.filter((c) => !c.done && !c.announced)
+    for (const y of open) {
+      if (y.from > w.day) continue
+      for (const o of open) {
+        if (o.from <= w.day || rank(o) >= rank(y) || o.from > y.to || o.to < y.from) continue
+        // not while that team still has an earlier camp running
+        if (w.camps.some((x) => x !== o && x.level === o.level && !x.done && x.from <= w.day)) continue
+        o.from = w.day
+      }
+    }
+    return open.filter((c) => c.from <= w.day).sort((a, b) => rank(a) - rank(b) || a.from - b.from)
+  }
   blocker(): AdvanceResult | null {
     const w = this.w
-    for (const c of w.camps) {
-      if (c.done || c.announced || c.from > w.day) continue
+    for (const c of this.dueCamps()) {
+      // an older coach-run side due today names its squad before the user is asked about a younger one
+      if (w.teams[c.level].control !== 'manual') { this.autoAnnounce(c); continue }
       if (w.teams[c.level].control === 'manual') return { stop: 'squad', level: c.level, campId: c.id, days: 0 }
     }
     for (const f of this.idx.byDay.get(w.day) ?? []) {
@@ -705,16 +738,17 @@ export class Game {
     return null
   }
 
+  private autoAnnounce(c: Camp) {
+    const w = this.w
+    const ids = this.suggestSquad(c.level, c.size)
+    w.teams[c.level].squad = []
+    if (this.announceSquad(c.level, ids, true)) w.teams[c.level].squad = ids
+    c.announced = true
+  }
   private processToday() {
     const w = this.w
     // coach-run teams name their squads
-    for (const c of w.camps) {
-      if (c.done || c.announced || c.from > w.day) continue
-      const ids = this.suggestSquad(c.level, c.size)
-      w.teams[c.level].squad = []
-      if (this.announceSquad(c.level, ids, true)) w.teams[c.level].squad = ids
-      c.announced = true
-    }
+    for (const c of this.dueCamps()) this.autoAnnounce(c)
     const away = this.calledUp()
     const todays = (this.idx.byDay.get(w.day) ?? []).filter((f) => !f.played)
     for (const f of todays) this.autoPlay(f, away)
