@@ -7,7 +7,7 @@ import { seasonYearFor, simClubFixture, startLeagueSeason } from './clubs/season
 import { transferWeek } from './clubs/transfers'
 import { progress } from './comps/engine'
 import type { Comp, GroupStage, KoStage } from './comps/types'
-import { addFriendly, ASIAN_CUP_2027, openSlots, planYear, rebuildCamps, scheduleYear, setupAsianCup, setupWorldCup } from './intl/calendar'
+import { addFriendly, ASIAN_CUP_2027, cancelClashingFriendlies, openSlots, planYear, rebuildCamps, scheduleYear, setupAsianCup, setupWorldCup } from './intl/calendar'
 import { applyRanking, rerank } from './intl/ranking'
 import { aiTactic, buildMTeam, eligible, pickSquad, selectionScore, teamName } from './intl/select'
 import { MatchSim } from './match/engine'
@@ -539,6 +539,7 @@ export class Game {
     if (progress(w, comp, this.rng)) {
       this.idx = buildIndex(w)
       if (comp.scope === 'nat') {
+        this.resolveClashes()
         rebuildCamps(w)
         const iran = natRef('IRN', comp.level)
         if (comp.done) this.closeComp(comp)
@@ -689,6 +690,19 @@ export class Game {
     }
   }
 
+  /** Call off friendlies that now clash with competitive fixtures, and tell the user. */
+  resolveClashes() {
+    const w = this.w
+    const off = cancelClashingFriendlies(w)
+    if (!off.length) return
+    // camps built around a cancelled friendly are rebuilt from what is left
+    w.camps = w.camps.filter((c) => c.done || c.announced)
+    rebuildCamps(w)
+    this.idx = buildIndex(w)
+    const mine = off.filter((o) => w.teams[o.level].control === 'manual')
+    if (mine.length) this.msg('match', `${mine.length} friendl${mine.length === 1 ? 'y' : 'ies'} called off`, `${mine.map((o) => `${LEVEL_NAME[o.level]} v ${w.nations[o.opp]?.name ?? o.opp} on ${fmtDay(o.day)} (clashes with a ${o.versus})`).join('; ')}. A team cannot play two matches in the same slot, and competitive fixtures take priority.`, true)
+  }
+
   /** True while Iran are still alive in the centrally-hosted tournament this camp was called for. */
   private inTournament(c: Camp): boolean {
     const comp = this.w.comps[c.compId]
@@ -810,7 +824,7 @@ export class Game {
         for (const n of seasonRollover(w, this.rng, w.day)) this.msg('news', n.split(' has ')[0].split(' (')[0], n)
         this.idx = buildIndex(w)
       }
-      if (m === 12) { planYear(w, this.rng, y + 1, w.day); this.idx = buildIndex(w) }
+      if (m === 12) { planYear(w, this.rng, y + 1, w.day); this.resolveClashes(); this.idx = buildIndex(w) }
       if (m === 4 && y >= 2030 && (y - 2030) % 4 === 0 && !w.comps.some((c) => c.key === `world-cup:${y}`)) {
         const hosts = y === 2030 ? ['ESP', 'POR', 'MAR'] : [Object.values(w.nations).sort((a, b) => b.points - a.points)[this.rng.int(0, 15)].code]
         const wc = setupWorldCup(w, this.rng, y, hosts)

@@ -114,6 +114,8 @@ export interface World {
   /** Result of each approach to a dual national: playerId → last day asked. */
   approaches: Record<number, Day>
   history: { year: number; comp: string; level: Level; result: string }[]
+  /** Last calendar year whose competitive fixtures have been drawn up; friendlies can only be booked up to here. */
+  plannedThrough?: number
   /** Short football news feed shown on the overview. */
   news?: NewsItem[]
 }

@@ -63,8 +63,11 @@ export function slotDays(level: Level, year: number): { day: Day; window: string
 }
 /** Window dates with nothing booked yet, far enough ahead to arrange a match. */
 export function openSlots(w: World, level: Level): { day: Day; window: string }[] {
-  const y = ymd(w.day).y
-  return [...slotDays(level, y), ...slotDays(level, y + 1)].filter((s) => s.day - w.day >= 10 && s.day - w.day <= 400 && !iranBusy(w, level, s.day))
+  const { y, m } = ymd(w.day)
+  // only years whose qualifiers and tournaments are already on the calendar: next year's are drawn on 1 December
+  const through = w.plannedThrough ?? (m === 12 ? y + 1 : y)
+  const days = through > y ? [...slotDays(level, y), ...slotDays(level, y + 1)] : slotDays(level, y)
+  return days.filter((s) => s.day - w.day >= 10 && s.day - w.day <= 400 && !iranBusy(w, level, s.day))
 }
 
 /**
@@ -249,6 +252,28 @@ export function planYear(w: World, rng: Rng, year: number, from: Day) {
   if (year % 2 === 0 && !has(`afc-u23:${year}`) && toDay(year, 4, 14) > from) setupYouthCup(w, rng, 'u23', year, toDay(year, 4, 14))
   if (year % 2 === 1 && !has(`afc-u20:${year}`) && toDay(year, 2, 12) > from) setupYouthCup(w, rng, 'u20', year, toDay(year, 2, 12))
   if (!has(`afc-u17:${year}`) && toDay(year, 5, 5) > from) setupYouthCup(w, rng, 'u17', year, toDay(year, 5, 5))
+  w.plannedThrough = Math.max(w.plannedThrough ?? 0, year)
+  cancelClashingFriendlies(w)
   scheduleYear(w, rng, year, from)
   rebuildCamps(w)
+}
+
+/**
+ * A team cannot play two matches in the same slot. Competitive fixtures always win: any unplayed Iran
+ * friendly within two days of a competitive match for the same team is called off. Returns what was cancelled.
+ */
+export function cancelClashingFriendlies(w: World): { level: Level; day: Day; opp: string; versus: string }[] {
+  const out: { level: Level; day: Day; opp: string; versus: string }[] = []
+  const iran = (f: { home: string; away: string }) => (f.home.startsWith('n:IRN:') ? f.home : f.away.startsWith('n:IRN:') ? f.away : null)
+  const comp = w.fixtures.filter((f) => !f.played && iran(f) && !w.comps[f.compId].friendly)
+  if (!comp.length) return out
+  w.fixtures = w.fixtures.filter((f) => {
+    const ref = iran(f)
+    if (f.played || !ref || !w.comps[f.compId].friendly) return true
+    const clash = comp.find((c) => iran(c) === ref && Math.abs(c.day - f.day) <= 2)
+    if (!clash) return true
+    out.push({ level: ref.split(':')[2] as Level, day: f.day, opp: (f.home === ref ? f.away : f.home).split(':')[1], versus: w.comps[clash.compId].short })
+    return false
+  })
+  return out
 }
