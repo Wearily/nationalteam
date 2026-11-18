@@ -39,6 +39,34 @@ export function developAll(w: World, rng: Rng, day: Day) {
 }
 
 /**
+ * What a national-team camp does for a young player. Training alongside better players under a good coach
+ * can move a developing player on a little: one small step of the same kind as a month of normal growth.
+ * It is a chance, not a gift: it scales with how far above him the squad is, the coach's work with young
+ * players, his own professionalism and the length of the camp; it needs room below his potential; and it
+ * can happen at most once every three months, so repeated call-ups cannot be farmed.
+ * Returns true when he improved.
+ */
+export function campLift(rng: Rng, p: Player, day: Day, squadAvg: number, coachYouth: number, days: number): boolean {
+  const age = ageOn(p.dob, day)
+  if (age > 23 || p.pot - p.ovr < 3) return false
+  if (p.campDay != null && day - p.campDay < 90) return false
+  const step = clamp((squadAvg - p.ovr) / 8, 0, 1.3) // little to learn from players at his own level
+  if (step < 0.2) return false
+  const chance = 0.22 * step * (0.55 + coachYouth / 14) * (0.7 + p.traits.professionalism / 33) * clamp(days / 6, 0.5, 1.6) * (age <= 20 ? 1.15 : 1)
+  if (!rng.chance(Math.min(0.5, chance))) return false
+  const w8 = POS_WEIGHTS[p.pos[0]]
+  for (let i = 0; i < N_ATTR; i++) {
+    const k = ATTRS[i]
+    const mental = i >= A.decisions && i <= A.teamwork
+    // a camp sharpens understanding of the game more than it builds the body
+    if (rng.chance((mental ? 0.3 : 0.14) + ((w8[k] as number) ?? 0) * 0.04)) p.attrs[i] = clamp(p.attrs[i] + 1, 5, 99)
+  }
+  p.ovr = Math.min(p.pot, overallAt(p.attrs, p.pos[0]))
+  p.campDay = day
+  return true
+}
+
+/**
  * Potential is an estimate, and sustained evidence moves it. Checked monthly.
  *
  * A rise needs all of: a young player (24 or under; a narrow late-bloomer window to 27), a proper run of

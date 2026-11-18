@@ -2,7 +2,7 @@ import { fmtDay, toDay, ymd, type Day } from './core/date'
 import { Rng, clamp } from './core/rng'
 import { A, fitToOverall, overallAt } from './ratings/attributes'
 import { mergeExtra, type RawData, type RawExtra } from './data/raw'
-import { developAll, revalue, reviewPotential, seasonRollover } from './career/develop'
+import { campLift, developAll, revalue, reviewPotential, seasonRollover } from './career/develop'
 import { seasonYearFor, simClubFixture, startLeagueSeason } from './clubs/season'
 import { transferWeek } from './clubs/transfers'
 import { progress } from './comps/engine'
@@ -627,8 +627,36 @@ export class Game {
       const ref = natRef('IRN', c.level)
       if (w.fixtures.some((f) => !f.played && (f.home === ref || f.away === ref) && f.day <= c.to + 1)) continue
       c.done = true
+      this.campEffects(c)
       if (!w.camps.some((x) => x !== c && !x.done && x.level === c.level && x.announced)) w.teams[c.level].squad = []
     }
+  }
+
+  /** End of a camp: young players may have learned something; anyone who never got on loses a little sharpness. */
+  private campEffects(c: Camp) {
+    const w = this.w
+    const team = w.teams[c.level]
+    const squad = team.squad.map((id) => w.players[id]).filter(Boolean)
+    if (squad.length < 11) return
+    const top = [...squad].sort((a, b) => b.ovr - a.ovr).slice(0, 14)
+    const avg = top.reduce((a, p) => a + p.ovr, 0) / top.length
+    const coach = team.coachId != null ? w.staff[team.coachId] : null
+    const ref = natRef('IRN', c.level)
+    const played = new Set<number>()
+    for (const f of w.fixtures) {
+      if (!f.played || f.day < c.from || f.day > c.to || (f.home !== ref && f.away !== ref) || f.report == null) continue
+      const rep = w.reports.find((r) => r.id === f.report)
+      if (rep) for (const side of rep.players) for (const st of side) if (st.played && st.mins >= 10) played.add(st.id)
+    }
+    const days = Math.max(3, c.to - c.from)
+    const improved: Player[] = []
+    for (const p of squad) {
+      if (campLift(this.rng, p, w.day, avg, coach?.youth ?? 10, days)) improved.push(p)
+      // a camp without a minute on the pitch costs match sharpness: he has missed club football for it
+      if (!played.has(p.id)) p.sharp = Math.max(25, p.sharp - Math.min(8, 2 + days * 0.5))
+    }
+    if (improved.length && (c.level === 'senior' || team.control === 'manual'))
+      this.msg('squad', `${LEVEL_NAME[c.level]} camp report`, `${improved.map((p) => `${p.name} (${Math.floor((w.day - p.dob) / 365.25)})`).join(', ')} ${improved.length === 1 ? 'has' : 'have'} come on noticeably from training with the group${coach ? ` under ${coach.name}` : ''}.`, false, `player:${improved[0].id}`)
   }
 
   private newDay() {
