@@ -161,6 +161,8 @@ export interface Staff {
   wage: number
   contractEnd: Day
   real: boolean
+  /** Day he took his current job (for his match record). */
+  since?: Day
 }
 
 /** "c:<clubId>" or "n:<CODE>:<level>". */

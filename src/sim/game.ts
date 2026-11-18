@@ -262,6 +262,7 @@ export class Game {
     for (const t of Object.values(w.teams)) if (t.coachId === staffId) t.coachId = null
     team.coachId = staffId
     s.job = `nation:IRN:${level}`
+    s.since = w.day
     s.contractEnd = toDay(ymd(w.day).y + 2, 7, 31)
     w.fed.budget -= fee
     w.fed.ledger.push({ day: w.day, label: `Appointment of ${s.name}`, amount: -fee })

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
-import { fmtDay } from '../../sim/core/date'
-import { SCOUT_SCOPES, type ScoutScope } from '../../sim/world/state'
+import { fmtDay, ymd } from '../../sim/core/date'
+import { SCOUT_SCOPES, type ScoutScope, type World } from '../../sim/world/state'
 import { LEVEL_NAME, LEVELS, type Level, type Staff as StaffT } from '../../sim/world/types'
 import { Empty, Flag, Meter, money, tone } from '../bits'
 import { useGame } from '../store'
@@ -8,30 +8,70 @@ import { useGame } from '../store'
 const Skill = ({ v }: { v: number }) => <span className="num" style={{ fontWeight: 680, color: v >= 15 ? '#86efac' : v >= 11 ? '#fde047' : '#fdba74' }}>{v}</span>
 const age = (day: number, dob: number) => Math.floor((day - dob) / 365.25)
 
+/** Results of an Iran team since its current coach took charge. */
+function recordOf(world: World, level: Level, since: number) {
+  const ref = `n:IRN:${level}`
+  const r = { p: 0, w: 0, d: 0, l: 0, gf: 0, ga: 0 }
+  for (const f of world.fixtures) {
+    if (!f.played || f.day < since || (f.home !== ref && f.away !== ref)) continue
+    const home = f.home === ref
+    const [us, them] = home ? [f.hg, f.ag] : [f.ag, f.hg]
+    const pens = f.pens ? (home ? f.pens[0] > f.pens[1] : f.pens[1] > f.pens[0]) : null
+    r.p++; r.gf += us; r.ga += them
+    if (us > them || pens === true) r.w++
+    else if (us < them || pens === false) r.l++
+    else r.d++
+  }
+  return r
+}
+
 export function Staff() {
   const { w, cmd, notify } = useGame()
   const world = w!
   const [level, setLevel] = useState<Level>('senior')
-  const coaches = useMemo(() => world.staff.filter((s) => s.role === 'coach' && (!s.job || s.job.startsWith('nation:IRN'))).sort((a, b) => b.rep - a.rep), [world])
+  const current = world.teams[level].coachId != null ? world.staff[world.teams[level].coachId!] : null
+  // candidates: free agents, plus coaches of Iran's other teams who could be moved across
+  const coaches = useMemo(() => world.staff.filter((s) => s.role === 'coach' && s.id !== current?.id && (!s.job || s.job.startsWith('nation:IRN'))).sort((a, b) => b.rep - a.rep), [world, current])
   const bias = (s: StaffT) => (s.abroadBias > 0.25 ? 'Abroad-based' : s.abroadBias < -0.25 ? 'Home-based' : 'Balanced')
+  const Cmp = ({ v, k }: { v: number; k: 'tactics' | 'motivation' | 'youth' | 'judging' }) => {
+    const d = current ? v - current[k] : 0
+    return <span className="row" style={{ gap: 4, justifyContent: 'center' }}><Skill v={v} />{d !== 0 && <span className={`ovr-d ${d > 0 ? 'up' : 'down'}`}>{d > 0 ? '▲' : '▼'}{Math.abs(d)}</span>}</span>
+  }
   return (
     <div className="page-inner">
       <div className="grid g4">
-        {LEVELS.map((l) => { const t = world.teams[l]; const c = t.coachId != null ? world.staff[t.coachId] : null; return (
-          <button key={l} className="card" style={{ textAlign: 'left', padding: 16, outline: level === l ? '1px solid rgba(255,255,255,0.4)' : 'none' }} onClick={() => setLevel(l)}>
-            <div className="row"><span className="eyebrow">{LEVEL_NAME[l]}</span><span className={`pill right ${t.control === 'manual' ? 'blue' : ''}`}>{t.control === 'manual' ? 'You' : 'Coach'}</span></div>
-            <div style={{ fontWeight: 650, fontSize: 15, marginTop: 8 }}>{c?.name ?? 'Vacant'}</div>
-            <div className="faint" style={{ fontSize: 12 }}>{c ? `${c.formation} · ${bias(c)} · to ${fmtDay(c.contractEnd, true).slice(-4)}` : 'Appoint a head coach'}</div>
-          </button>
-        ) })}
+        {LEVELS.map((l) => {
+          const t = world.teams[l]
+          const c = t.coachId != null ? world.staff[t.coachId] : null
+          const r = recordOf(world, l, c?.since ?? world.startDay)
+          return (
+            <button key={l} className="card" style={{ textAlign: 'left', padding: 16, outline: level === l ? '1.5px solid rgba(255,255,255,0.55)' : 'none' }} onClick={() => setLevel(l)}>
+              <div className="row"><span className="eyebrow">{LEVEL_NAME[l]}</span><span className={`pill right ${t.control === 'manual' ? 'blue' : ''}`}>{t.control === 'manual' ? 'You manage' : 'Coach manages'}</span></div>
+              <div className="row" style={{ marginTop: 8, gap: 8 }}>{c && <Flag code={c.nat} />}<b style={{ fontSize: 16 }} className="truncate">{c?.name ?? 'Vacant'}</b></div>
+              <div className="faint" style={{ fontSize: 12.5 }}>{c ? `${c.formation} · ${bias(c)} · contract to ${ymd(c.contractEnd).y}` : 'Appoint a head coach'}</div>
+              {c && <>
+                <div className="row" style={{ marginTop: 12, gap: 0, justifyContent: 'space-between' }}>
+                  {([['Tac', c.tactics], ['Mot', c.motivation], ['Yth', c.youth], ['Jud', c.judging]] as const).map(([k, v]) => <span key={k} className="col center" style={{ gap: 1 }}><Skill v={v} /><span className="faint" style={{ fontSize: 10.5 }}>{k}</span></span>)}
+                  <span className="col center" style={{ gap: 1 }}><b className="num">{Math.round(c.rep)}</b><span className="faint" style={{ fontSize: 10.5 }}>Rep</span></span>
+                </div>
+                <div className="row" style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--line)', fontSize: 12.5 }}>
+                  {r.p ? <><b className="num">{r.w}W {r.d}D {r.l}L</b><span className="faint num">{r.gf}–{r.ga}</span><span className="pill right">{Math.round((r.w / r.p) * 100)}% won</span></> : <span className="faint">No matches yet</span>}
+                </div>
+              </>}
+            </button>
+          )
+        })}
       </div>
       <div className="card flush">
-        <div className="card-head"><h3>Available head coaches</h3><span className="faint">Appointing for the {LEVEL_NAME[level]} team · a signing fee of half a year's salary applies</span></div>
-        <table className="t"><thead><tr><th>Coach</th><th className="c">Age</th><th className="c">Reputation</th><th className="c">Tactics</th><th className="c">Motivation</th><th className="c">Youth</th><th className="c">Judging</th><th>Formation</th><th>Selection leaning</th><th>Current role</th><th className="r">Salary</th><th /></tr></thead><tbody>
+        <div className="card-head"><h3>Candidates for the {LEVEL_NAME[level]} job</h3><span className="faint">{current ? `Arrows compare each candidate with ${current.name}` : 'The post is vacant'} · signing fee of half a year's salary</span></div>
+        <table className="t"><thead><tr><th>Coach</th><th className="c">Age</th><th className="c">Reputation</th><th className="c">Tactics</th><th className="c">Motivation</th><th className="c">Youth</th><th className="c">Judging</th><th>Formation</th><th>Selection leaning</th><th>Status</th><th className="r">Salary</th><th /></tr></thead><tbody>
+          {current && (
+            <tr className="hl"><td><span className="row" style={{ gap: 9 }}><Flag code={current.nat} /><b>{current.name}</b><span className="pill green">In the job</span></span></td><td className="c num">{age(world.day, current.dob)}</td><td className="c" style={{ width: 120 }}><Meter v={current.rep} /></td><td className="c"><Skill v={current.tactics} /></td><td className="c"><Skill v={current.motivation} /></td><td className="c"><Skill v={current.youth} /></td><td className="c"><Skill v={current.judging} /></td><td>{current.formation}</td><td className="muted">{bias(current)}</td><td className="muted">Iran {LEVEL_NAME[level]}</td><td className="r num">{money(current.wage)}</td><td /></tr>
+          )}
           {coaches.map((s) => (
-            <tr key={s.id}><td><span className="row" style={{ gap: 9 }}><Flag code={s.nat} /><b>{s.name}</b></span></td><td className="c num">{age(world.day, s.dob)}</td><td className="c" style={{ width: 120 }}><Meter v={s.rep} /></td><td className="c"><Skill v={s.tactics} /></td><td className="c"><Skill v={s.motivation} /></td><td className="c"><Skill v={s.youth} /></td><td className="c"><Skill v={s.judging} /></td><td>{s.formation}</td><td className="muted">{bias(s)}</td>
-              <td className="muted">{s.job ? `Iran ${LEVEL_NAME[s.job.split(':')[2] as Level]}` : 'Available'}</td><td className="r num">{money(s.wage)}</td>
-              <td className="r"><button className="btn sm" disabled={s.job === `nation:IRN:${level}`} onClick={() => void cmd<string | null>('hireCoach', level, s.id).then((e) => notify(e ?? `${s.name} appointed.`))}>Appoint</button></td></tr>
+            <tr key={s.id}><td><span className="row" style={{ gap: 9 }}><Flag code={s.nat} /><b>{s.name}</b></span></td><td className="c num">{age(world.day, s.dob)}</td><td className="c" style={{ width: 120 }}><Meter v={s.rep} /></td><td className="c"><Cmp v={s.tactics} k="tactics" /></td><td className="c"><Cmp v={s.motivation} k="motivation" /></td><td className="c"><Cmp v={s.youth} k="youth" /></td><td className="c"><Cmp v={s.judging} k="judging" /></td><td>{s.formation}</td><td className="muted">{bias(s)}</td>
+              <td className="muted">{s.job ? `Iran ${LEVEL_NAME[s.job.split(':')[2] as Level]} coach` : 'Available'}</td><td className="r num">{money(s.wage)}</td>
+              <td className="r"><button className="btn sm" onClick={() => void cmd<string | null>('hireCoach', level, s.id).then((e) => notify(e ?? `${s.name} appointed.`))}>{s.job ? 'Move here' : 'Appoint'}</button></td></tr>
           ))}
         </tbody></table>
       </div>
