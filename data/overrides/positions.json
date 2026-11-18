@@ -1,4 +1,5 @@
 {
   "_note": "Hand-set natural positions by player name (most natural first). Takes priority over every data source.",
-  "Aria Yousefi": ["RB", "LB", "RW", "LW"]
+  "Aria Yousefi": ["RB", "LB", "RW", "LW"],
+  "Arman Nahany": ["AM", "RW", "LW"]
 }
