@@ -199,13 +199,17 @@ export class Game {
     // reactions: debutants delighted, established players left out unhappy
     const pool = eligible(w, this.idx, 'IRN', level, w.day).filter((p) => !p.injury)
     const cut = [...ids].map((id) => selectionScore(w, w.players[id])).sort((a, b) => a - b)[Math.floor(ids.length * 0.35)] ?? 0
+    const campComp = w.comps[camp.compId]
+    const stakes = !campComp || campComp.friendly ? 0 : campComp.stages[0].neutral ? 2 : 1
     const snubbed: Player[] = []
     for (const p of pool) {
       if (set.has(p.id)) {
         if (level === 'senior' && p.caps === 0) p.morale = clamp(p.morale + 12, 0, 100)
         continue
       }
-      if (level === 'senior' && p.caps >= 15 && selectionScore(w, p) > cut) { p.morale = clamp(p.morale - 14, 0, 100); snubbed.push(p) }
+      // how much an omission stings depends on what he is missing: a tournament hurts, a qualifier matters,
+      // a friendly window is a shrug for all but the most established
+      if (level === 'senior' && p.caps >= (stakes === 0 ? 30 : 15) && selectionScore(w, p) > cut) { p.morale = clamp(p.morale - [4, 8, 14][stakes], 0, 100); snubbed.push(p) }
     }
     if (level === 'senior') {
       // call-up pattern shifts the Europe pathway culture
@@ -808,6 +812,8 @@ export class Game {
       }
     }
     if (d === 1) {
+      // moods settle: morale drifts back toward an even keel over the months
+      for (const pl of w.players) if (!pl.retired && pl.morale !== 65) pl.morale = Math.round((pl.morale + (65 - pl.morale) * 0.15) * 10) / 10
       // clubs' interest is spent in transfer windows, not by waiting for one: it fades quickly after a month in
       // which the window was open (January, July, August) and only slowly in the months between
       const fade = m === 2 || m === 8 || m === 9 ? 0.72 : 0.95
