@@ -131,14 +131,24 @@ export const shortName = (name: string) => {
   const parts = name.split(' ')
   return parts.length > 1 ? parts.slice(1).join(' ') : name
 }
-export function toMPlayer(p: Player, i: number): MPlayer {
+export function toMPlayer(p: Player, i: number, today = 0): MPlayer {
   // dynamic overall: form, morale and sharpness shift every attribute for this match
   const d = engineDelta(p)
+  const age = (today - p.dob) / 365.25
   return {
     id: p.id, name: p.name, short: shortName(p.name), num: p.num ?? i + 1, pos: p.pos, attrs: d ? p.attrs.map((a) => clamp(a + d, 1, 99)) : p.attrs,
     cond: clamp(p.cond, 40, 100), form: 0,
-    consistency: p.traits.consistency, bigMatch: p.traits.bigMatch, injuryProne: p.traits.injuryProne,
+    consistency: p.traits.consistency, bigMatch: p.traits.bigMatch, injuryProne: p.traits.injuryProne, prospect: prospectScore(p, age),
   }
+}
+
+/** Young, with room to grow, and short of senior experience: the players worth blooding when a match is safe. */
+export function prospectScore(p: Player, age: number): number {
+  if (age > 24) return 0
+  const room = clamp((p.pot - p.ovr) / 10, 0, 1)
+  const youth = age <= 20 ? 1 : age <= 22 ? 0.8 : 0.55
+  const green = p.caps < 3 ? 1 : p.caps < 10 ? 0.7 : 0.35
+  return Math.round(room * youth * green * 100) / 100
 }
 
 export function teamName(w: World, ref: TeamRef): { name: string; short: string; colors: [string, string] } {
@@ -175,7 +185,7 @@ export function buildMTeam(w: World, ref: TeamRef, squad: number[], tactic: Tact
   const nm = teamName(w, ref)
   // unique shirt numbers: keep a player's real number when free, otherwise the lowest unused
   const used = new Set<number>()
-  const mps = players.map(toMPlayer)
+  const mps = players.map((pl, i) => toMPlayer(pl, i, w.day))
   for (const m of mps) { const real = w.players[m.id].num; if (real && real <= 99 && !used.has(real)) { m.num = real; used.add(real) } else m.num = 0 }
   let next = 1
   for (const m of mps) if (!m.num) { while (used.has(next)) next++; m.num = next; used.add(next) }

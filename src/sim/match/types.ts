@@ -16,6 +16,8 @@ export interface MPlayer {
   consistency: number
   bigMatch: number
   injuryProne: number
+  /** 0–1: how much a coach would like to give this player experience (young, high ceiling, few caps). */
+  prospect?: number
 }
 
 export interface MTeam {

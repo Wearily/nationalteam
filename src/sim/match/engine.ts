@@ -1054,6 +1054,11 @@ export class MatchSim {
       const marks = SUB_MARKS
       if (this.aiSubMarks[t] < marks.length && min >= marks[this.aiSubMarks[t]] && !this.restart) {
         this.aiSubMarks[t]++
+        const lead = this.score[t] - this.score[o]
+        // a comfortable lead is the time to give a prospect minutes: in friendlies from two goals up after
+        // the break, in competitive matches only when it is truly over (four up, last quarter of an hour)
+        const safe = this.opts.importance <= 0.3 ? (lead >= 3 && min >= 46) || (lead >= 2 && min >= 55) : lead >= 4 && min >= 75
+        if (safe && this.subsUsed[t] < this.opts.subs && this.blooded[t] < 3 && this.bloodProspect(t)) continue
         if (this.subsUsed[t] < this.opts.subs) {
           // replace the most tired / worst performing outfielder
           let worst = -1
@@ -1072,6 +1077,32 @@ export class MatchSim {
         if (min >= 72 && diff > 0) { team.tactic.mentality = Math.max(25, base - 12); team.tactic.timeWasting = 50 }
       }
     }
+  }
+  private blooded: [number, number] = [0, 0]
+  /**
+   * Bring on the best unused prospect for an outfielder in a position he can genuinely play, taking off
+   * whoever has least to gain from staying on (established, tired, or already booked). Never the goalkeeper.
+   */
+  private bloodProspect(t: 0 | 1): boolean {
+    const team = this.teams[t]
+    let best: { s: number; b: number; v: number } | null = null
+    team.players.forEach((bp, b) => {
+      if (this.ps[t][b].played || !team.tactic.bench.includes(bp.id) || bp.pos[0] === 'GK' || (bp.prospect ?? 0) < 0.25) return
+      for (let s = 1; s < 11; s++) {
+        const i = this.on[t][s]
+        if (i < 0) continue
+        const cur = team.players[i]
+        const pen = positionPenalty(bp.pos, this.slots[t][s].pos)
+        if (pen > 3 || (cur.prospect ?? 0) >= 0.25) continue // no square pegs, and do not hook another youngster
+        const v = (bp.prospect ?? 0) * 10 - pen + (100 - this.energy[t][i]) * 0.06 + (this.yellowed[t].has(cur.id) ? 1.5 : 0) + Math.min(2, this.ps[t][i].mins / 45)
+        if (!best || v > best.v) best = { s, b, v }
+      }
+    })
+    if (!best) return false
+    const pick = best as { s: number; b: number; v: number }
+    this.doSub(t, pick.s, pick.b)
+    this.blooded[t]++
+    return true
   }
   needsSub(t: 0 | 1) { return this.mustSub[t] }
   /** Hand a side to its coach (substitutions and in-game adjustments) or take it back. */
