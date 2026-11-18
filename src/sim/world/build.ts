@@ -129,7 +129,9 @@ export function buildWorld(raw: RawData, seed: number, managerName: string, over
   }
   for (const r of raw.players) {
     if (!r.dob || !r.pos?.length || !r.nat?.length || !nations[r.nat[0]]) continue
-    const dob = parseDay(r.dob)
+    // year-only birth dates: count the birthday as 1 January so the age ticks over at New Year
+    const approx = !!r.dobYearOnly || r.dob.endsWith('-07-01')
+    const dob = approx ? toDay(+r.dob.slice(0, 4), 1, 1) : parseDay(r.dob)
     const age = ageOn(dob, today)
     if (age < 14 || age > 42) continue
     const club = r.club ? clubByRid.get(r.club) : undefined
@@ -141,6 +143,7 @@ export function buildWorld(raw: RawData, seed: number, managerName: string, over
       leagueStrength: club ? leagues[club.leagueId].strength : 45, real: true, rid: r.id, heightCm: r.heightCm, foot: r.foot, pot: fixed ? Math.max(fixed[0], fixed[1]) : undefined,
     })
     if (r.valueEur) { p.value = r.valueEur; p.valueHist = [[today, p.value]] }
+    if (approx) p.dobApprox = true
     p.caps = r.caps ?? 0
     p.goals = r.goals ?? 0
     p.capTied = !!r.capTied || p.caps >= 3

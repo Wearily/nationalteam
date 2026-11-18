@@ -46,6 +46,8 @@ export interface Player {
   real: boolean
   name: string
   dob: Day
+  /** Only the birth year is known: dob is 1 January of that year, so age ticks over each New Year. */
+  dobApprox?: boolean
   nat: string[]
   born?: string
   pos: Pos[]

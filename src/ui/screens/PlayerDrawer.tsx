@@ -4,7 +4,7 @@ import { fmtDay, ymd } from '../../sim/core/date'
 import { A, type Attr, ATTR_LABEL, effectiveOverall, faceStats, POS_LIST, POS_NAME } from '../../sim/ratings/attributes'
 import { dynOvr, engineDelta } from '../../sim/ratings/dynamic'
 import { LEVEL_NAME, type Level, type Player, type SeasonStats } from '../../sim/world/types'
-import { clubLogo, ageOf, clubOf, Crest, Face, Flag, leagueOf, Meter, money, ovrColor, PosTag, Rating, ratingColor, scoutView } from '../bits'
+import { clubLogo, playerPhoto, ageOf, clubOf, Crest, Face, Flag, leagueOf, Meter, money, ovrColor, PosTag, Rating, ratingColor, scoutView } from '../bits'
 import { useGame } from '../store'
 
 const CATS: { name: string; attrs: Attr[] }[] = [
@@ -47,6 +47,9 @@ export function PlayerProfile({ id }: { id: number }) {
     return () => window.removeEventListener('keydown', h)
   }, [openPlayer])
   if (!p) return null
+  const photo = playerPhoto(p)
+  // FotMob headshots are cut-outs; anything else is an ordinary photograph and fills the side panel
+  const fullPhoto = !!photo && !photo.startsWith('faces/fm/')
   const v = scoutView(p)
   const d = dynOvr(p)
   const eng = engineDelta(p)
@@ -63,11 +66,11 @@ export function PlayerProfile({ id }: { id: number }) {
     <div className={`profile ${tab === 'overview' ? '' : 'dark'}`}>
       <div className="profile-bg" />
       <button className="btn profile-close" onClick={() => openPlayer(null)}><X />Close</button>
-      <div className="profile-face">
-        <div className="face"><Face p={p} /></div>
+      <div className={`profile-face ${fullPhoto ? 'full' : ''}`}>
+        {fullPhoto ? <img className="photo" src={`${import.meta.env.BASE_URL}${photo}`} alt="" /> : <div className="face"><Face p={p} /></div>}
         <div className="profile-id">
           <div className="big">{p.num ?? age}</div>
-          <small>Age (date of birth)</small><b>{age} ({dob.d} {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][dob.m - 1]} {dob.y})</b>
+          <small>Age (date of birth)</small><b>{age} ({p.dobApprox ? `–/–/${dob.y}` : `${dob.d} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][dob.m - 1]} ${dob.y}`})</b>
           <small>Height and foot</small><b>{p.heightCm} cm · {p.foot === 'L' ? 'Left' : p.foot === 'B' ? 'Both' : 'Right'}</b>
         </div>
       </div>

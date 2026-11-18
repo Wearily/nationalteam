@@ -421,3 +421,13 @@ h1 { font-size: 36px; font-weight: 720; } h2 { font-size: 22px; } h3 { font-size
 .profile-id small:nth-of-type(1), .profile-id b:nth-of-type(1) { grid-column: 2; }
 .profile-id small:nth-of-type(2), .profile-id b:nth-of-type(2) { grid-column: 3; }
 .profile-id small { grid-row: 1; }
+
+/* ordinary photographs: fill the whole side panel and dissolve into the page on the right */
+.profile-face.full { padding: 0; justify-content: flex-end; }
+.profile-face.full::before { display: none; }
+.profile-face.full .photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 18%; -webkit-mask-image: linear-gradient(to right, #000 0, #000 90%, transparent 100%); mask-image: linear-gradient(to right, #000 0, #000 90%, transparent 100%); }
+.profile-face.full::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 42%; background: linear-gradient(transparent, rgba(6,12,26,0.88)); -webkit-mask-image: linear-gradient(to right, #000 90%, transparent 100%); mask-image: linear-gradient(to right, #000 90%, transparent 100%); pointer-events: none; }
+.profile-face.full .profile-id { z-index: 1; margin: 0 0 34px; }
+
+.profile-id b { white-space: nowrap; }
+.profile-id { grid-template-columns: auto auto 1fr; }

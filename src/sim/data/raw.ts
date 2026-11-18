@@ -7,8 +7,9 @@ export interface RawPlayer {
   /** Stable id. Wikidata QID when known ("Q123"), otherwise "x:<slug>". */
   id: string
   name: string
-  /** ISO date YYYY-MM-DD. If only a year is known use YYYY-07-01. */
+  /** ISO date YYYY-MM-DD. If only a year is known use YYYY-07-01 (treated as year-only), or set dobYearOnly. */
   dob: string
+  dobYearOnly?: boolean
   /** FIFA three-letter codes. First entry is the sporting nationality if declared. */
   nat: string[]
   /** Positions, most natural first. */
