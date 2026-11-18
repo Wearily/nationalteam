@@ -1059,6 +1059,9 @@ export class MatchSim {
         // the break, in competitive matches only when it is truly over (four up, last quarter of an hour)
         const safe = this.opts.importance <= 0.3 ? (lead >= 3 && min >= 46) || (lead >= 2 && min >= 55) : lead >= 4 && min >= 75
         if (safe && this.subsUsed[t] < this.opts.subs && this.blooded[t] < 3 && this.bloodProspect(t)) continue
+        // with another match days away and this one won, take the important players off before they tire further
+        const won = (lead >= 3 && min >= 60) || (lead >= 2 && min >= 70)
+        if (won && this.opts.rest?.[t] && this.subsUsed[t] < this.opts.subs && this.rested[t] < 3 && this.restKeyPlayer(t)) continue
         if (this.subsUsed[t] < this.opts.subs) {
           // replace the most tired / worst performing outfielder
           let worst = -1
@@ -1077,6 +1080,30 @@ export class MatchSim {
         if (min >= 72 && diff > 0) { team.tactic.mentality = Math.max(25, base - 12); team.tactic.timeWasting = 50 }
       }
     }
+  }
+  private rested: [number, number] = [0, 0]
+  /**
+   * Protect a key player: among the best five outfielders still on, take off the one who most needs it
+   * (lowest energy, or carrying a yellow card) provided the bench has a real replacement for his position.
+   */
+  private restKeyPlayer(t: 0 | 1): boolean {
+    const team = this.teams[t]
+    const q = (i: number) => team.players[i].attrs.reduce((a, b) => a + b, 0)
+    const onPitch: number[] = []
+    for (let s = 1; s < 11; s++) if (this.on[t][s] >= 0) onPitch.push(s)
+    const key = [...onPitch].sort((a, b) => q(this.on[t][b]) - q(this.on[t][a])).slice(0, 5)
+    let best = -1
+    let bv = -1
+    for (const s of key) {
+      const i = this.on[t][s]
+      if (this.ps[t][i].subOn || this.pickBench(t, s) < 0) continue // do not hook a substitute; need cover
+      const v = (100 - this.energy[t][i]) + (this.yellowed[t].has(team.players[i].id) ? 12 : 0)
+      if (v > bv) { bv = v; best = s }
+    }
+    if (best < 0 || bv < 18) return false // everyone still fresh: no need
+    this.doSub(t, best, this.pickBench(t, best))
+    this.rested[t]++
+    return true
   }
   private blooded: [number, number] = [0, 0]
   /**

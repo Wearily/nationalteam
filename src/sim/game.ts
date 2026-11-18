@@ -410,7 +410,11 @@ export class Game {
       return buildMTeam(w, ref, squad, aiTactic(w, r.code, opp.code), true, true)
     })
     const imp = comp.friendly ? 0.2 : comp.stages[f.stage].type === 'ko' ? 1 : 0.7
-    return new MatchSim(teams[0], teams[1], { seed: this.rng.int(1, 2 ** 31), neutral: !!f.neutral, knockout: this.isKo(f, comp), subs: comp.subs, importance: imp, record })
+    // is another match close behind this one? (a later round of the same tournament, or a fixture within six days)
+    const lastStage = f.stage === comp.stages.length - 1
+    const soon = (ref: string) => w.fixtures.some((x) => x !== f && !x.played && (x.home === ref || x.away === ref) && x.day > f.day && x.day <= f.day + 6)
+    const rest: [boolean, boolean] = [f.home, f.away].map((ref) => soon(ref) || (!comp.friendly && comp.stages[f.stage].type === 'ko' && !lastStage && f.slot !== 99)) as [boolean, boolean]
+    return new MatchSim(teams[0], teams[1], { seed: this.rng.int(1, 2 ** 31), neutral: !!f.neutral, knockout: this.isKo(f, comp), subs: comp.subs, importance: imp, rest, record })
   }
   private coachApproach(level: Level, opp: string): Partial<Tactic> {
     const t = this.w.teams[level]

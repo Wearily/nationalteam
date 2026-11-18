@@ -38,6 +38,8 @@ export interface MatchOpts {
   subs: number
   /** 0–1, how big the occasion is (affects bigMatch trait). */
   importance: number
+  /** Per side: another match is coming within days (tournament or congested window), so key players are worth protecting. */
+  rest?: [boolean, boolean]
   /** Keep position frames for the 2D viewer. */
   record: boolean
 }
