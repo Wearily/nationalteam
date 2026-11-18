@@ -449,3 +449,26 @@ h1 { font-size: 36px; font-weight: 720; } h2 { font-size: 22px; } h3 { font-size
 
 .board { aspect-ratio: 1 / 1.38; }
 .drawer { width: min(1180px, 94vw); }
+
+/* match ratings table: fixed stat columns, the name column takes what is left and truncates */
+.t.compact { table-layout: fixed; min-width: 520px; }
+.t.compact th, .t.compact td { padding-left: 4px; padding-right: 4px; }
+.t.compact td:first-child, .t.compact th:first-child { padding-left: 16px; }
+.t.compact td:last-child, .t.compact th:last-child { padding-right: 12px; }
+.t.compact td:first-child { overflow: hidden; }
+.t.compact td:first-child .row { min-width: 0; }
+.t.compact .truncate { min-width: 0; }
+@media (max-width: 1320px) { .t.compact .opt { display: none; } .t.compact col.opt { width: 0 !important; visibility: collapse; } .t.compact { min-width: 440px; } }
+
+/* a flush card that is also a scroll container must scroll, not clip */
+.card.flush.scroll { overflow: auto; }
+.page-inner > .grid { min-height: 0; }
+
+/* never let the header or a wide table stretch the page past the window */
+.app { grid-template-columns: minmax(0, 1fr); }
+.top { min-width: 0; }
+.top .brand b, .pnav button, .date-chip, .date-chip b, .top .btn { white-space: nowrap; }
+.page-inner, .grid > * { min-width: 0; }
+@media (max-width: 1540px) { .next-chip { display: none; } }
+.next-chip { min-width: 0; flex-shrink: 1; }
+@media (max-width: 1260px) { .top { gap: 14px; padding: 0 18px; } .pnav button { padding: 0 9px; font-size: 15px; } .page { padding: 20px 18px 32px; } .subnav { padding: 0 18px; } }

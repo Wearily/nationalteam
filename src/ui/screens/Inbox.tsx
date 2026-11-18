@@ -1,4 +1,4 @@
-import { ChevronRight } from 'lucide-react'
+import { CheckCheck, ChevronRight } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { fmtDay } from '../../sim/core/date'
 import { Empty } from '../bits'
@@ -10,13 +10,18 @@ export function Inbox() {
   const { w, cmd, link } = useGame()
   const [cat, setCat] = useState('all')
   const list = [...w!.inbox].reverse().filter((m) => cat === 'all' || m.cat === cat)
+  const unread = w!.inbox.filter((m) => !m.read).length
   const [sel, setSel] = useState<number | null>(list[0]?.id ?? null)
   const cur = w!.inbox.find((m) => m.id === sel) ?? list[0]
   useEffect(() => { if (cur && !cur.read) void cmd('markRead', cur.id) }, [cur?.id]) // eslint-disable-line
   return (
     <div className="page-inner" style={{ height: '100%' }}>
-      <div className="seg" style={{ alignSelf: 'flex-start' }}>
+      <div className="row">
+      <div className="seg">
         {['all', 'match', 'squad', 'scout', 'transfer', 'injury', 'board', 'news', 'staff'].map((c) => <button key={c} className={cat === c ? 'on' : ''} onClick={() => setCat(c)}>{c === 'all' ? 'All' : CAT[c][0]}</button>)}
+      </div>
+      <span className="faint right">{unread} unread</span>
+      <button className="btn" disabled={!unread} onClick={() => void cmd('markAllRead')}><CheckCheck />Mark all as read</button>
       </div>
       <div className="grid" style={{ gridTemplateColumns: '420px 1fr', flex: 1, minHeight: 0 }}>
         <div className="card flush scroll">

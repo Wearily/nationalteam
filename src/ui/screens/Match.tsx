@@ -136,25 +136,33 @@ export function Feed({ events, max }: { events: MEvent[]; max?: number }) {
   if (!list.length) return <Empty>Waiting for kick-off.</Empty>
   return <div className="feed">{list.map((e, i) => <div key={events.length - i} className={`feed-item ${e.type === 'goal' || e.type === 'pen' ? 'goal' : e.type === 'red' ? 'red' : ''}`}><span className="m">{e.min}{e.plus ? `+${e.plus}` : ''}'</span><span>{e.type === 'yellow' ? '🟨 ' : e.type === 'red' ? '🟥 ' : e.type === 'sub' ? '⇄ ' : ''}{e.text}</span></div>)}</div>
 }
-export function RatingsTable({ ps, names, title, color, energy, ids }: { ps: PStats[]; names: (id: number) => string; title: string; color: string; energy?: number[]; ids?: number[] }) {
+export function RatingsTable({ ps, names, title, color, energy }: { ps: PStats[]; names: (id: number) => string; title: string; color: string; energy?: number[]; ids?: number[] }) {
   const open = useGame((s) => s.openPlayer)
   const world = useGame((s) => s.w)
   const rows = ps.map((p, i) => ({ p, i })).filter((x) => x.p.played).sort((a, b) => Number(b.p.on) - Number(a.p.on) || b.p.rating - a.p.rating)
-  void ids
   return (
     <div className="card flush">
       <div className="card-head"><span style={{ width: 10, height: 10, borderRadius: 3, background: color }} /><h3>{title}</h3></div>
-      <table className="t"><thead><tr><th>Player</th><th className="c">Min</th><th className="c">G</th><th className="c">A</th><th className="c">Sh</th><th className="c">xG</th><th className="c">Pass</th><th className="c">KP</th><th className="c">Tkl</th><th className="c">Int</th>{energy && <th className="c">Fit</th>}<th className="r">Rating</th></tr></thead><tbody>
-        {rows.map(({ p, i }) => (
-          <tr key={p.id} className="click" style={{ opacity: p.on ? 1 : 0.55 }} onClick={() => open(p.id)}>
-            <td><span className="row" style={{ gap: 9, display: 'inline-flex' }}>{(p.pos ?? world?.players[p.id]?.pos[0]) && <PosTag pos={(p.pos ?? world!.players[p.id].pos[0])!} />}<span style={{ fontWeight: 560 }}>{names(p.id)}</span></span>{p.yellow > 0 && ' 🟨'}{p.red > 0 && ' 🟥'}{p.subOn ? <span className="faint"> ↑{p.subOn}'</span> : null}{p.subOff ? <span className="faint"> ↓{p.subOff}'</span> : null}</td>
-            <td className="c num">{Math.round(p.mins)}</td><td className="c num">{p.goals || ''}</td><td className="c num">{p.assists || ''}</td><td className="c num">{p.shots || ''}</td><td className="c num">{p.xg ? p.xg.toFixed(2) : ''}</td>
-            <td className="c num">{p.passesC}/{p.passes}</td><td className="c num">{p.keyPasses || ''}</td><td className="c num">{p.tacklesWon || ''}</td><td className="c num">{p.interceptions || ''}</td>
-            {energy && <td className="c num" style={{ color: energy[i] < 60 ? '#fca5a5' : undefined }}>{p.on ? `${energy[i]}%` : ''}</td>}
-            <td className="r"><span className="rt" style={{ background: ratingColor(p.rating) }}>{p.rating.toFixed(1)}</span></td>
-          </tr>
-        ))}
-      </tbody></table>
+      <div className="scroll">
+        <table className="t compact">
+          <colgroup><col /><col style={{ width: 54 }} /><col style={{ width: 40 }} /><col style={{ width: 30 }} /><col style={{ width: 30 }} /><col style={{ width: 32 }} /><col style={{ width: 46 }} /><col style={{ width: 58 }} /><col className="opt" style={{ width: 34 }} /><col style={{ width: 36 }} /><col className="opt" style={{ width: 38 }} />{energy && <col style={{ width: 46 }} />}</colgroup>
+          <thead><tr><th>Player</th><th className="c">Rating</th><th className="c">Min</th><th className="c">G</th><th className="c">A</th><th className="c">Sh</th><th className="c">xG</th><th className="c">Pass</th><th className="c opt" title="Key passes">KP</th><th className="c" title="Tackles won">Tkl</th><th className="c opt" title="Ball recoveries">Rec</th>{energy && <th className="c">Fit</th>}</tr></thead>
+          <tbody>
+            {rows.map(({ p, i }) => {
+              const pos = p.pos ?? world?.players[p.id]?.pos[0]
+              return (
+                <tr key={p.id} className="click" style={{ opacity: p.on ? 1 : 0.55 }} onClick={() => open(p.id)}>
+                  <td><span className="row" style={{ gap: 8 }}>{pos && <PosTag pos={pos} />}<span className="truncate" style={{ fontWeight: 560 }} title={names(p.id)}>{names(p.id)}</span><span className="faint" style={{ flex: 'none', fontSize: 12 }}>{p.yellow > 0 && '🟨'}{p.red > 0 && '🟥'}{p.subOn ? ` ↑${p.subOn}'` : ''}{p.subOff ? ` ↓${p.subOff}'` : ''}</span></span></td>
+                  <td className="c"><span className="rt" style={{ background: ratingColor(p.rating) }}>{p.rating.toFixed(1)}</span></td>
+                  <td className="c num">{Math.round(p.mins)}</td><td className="c num">{p.goals || ''}</td><td className="c num">{p.assists || ''}</td><td className="c num">{p.shots || ''}</td><td className="c num">{p.xg ? p.xg.toFixed(2) : ''}</td>
+                  <td className="c num">{p.passesC}/{p.passes}</td><td className="c num opt">{p.keyPasses || ''}</td><td className="c num">{p.tacklesWon || ''}</td><td className="c num opt">{p.interceptions || ''}</td>
+                  {energy && <td className="c num" style={{ color: energy[i] < 60 ? '#fca5a5' : undefined }}>{p.on ? `${energy[i]}%` : ''}</td>}
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }

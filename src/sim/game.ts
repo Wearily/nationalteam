@@ -350,6 +350,7 @@ export class Game {
   setControl(level: Level, control: 'manual' | 'auto') { this.w.teams[level].control = control }
   setTactic(level: Level, tac: Tactic) { this.w.teams[level].tactic = tac }
   setBudget(key: 'scoutBudget' | 'youthInvest', v: number) { this.w.fed[key] = clamp(Math.round(v), 0, 5_000_000) }
+  markAllRead() { for (const m of this.w.inbox) m.read = true }
   markRead(id: number) { const m = this.w.inbox.find((x) => x.id === id); if (m) m.read = true }
 
   // ───────────────────────── matches ─────────────────────────
