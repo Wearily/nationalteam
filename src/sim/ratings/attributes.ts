@@ -73,21 +73,32 @@ export function overallAt(attrs: ArrayLike<number>, pos: Pos): number {
 /** Overall when played at `at`, given the positions the player is natural in. */
 const GROUP: Record<Pos, number> = { GK: 0, CB: 1, RB: 2, LB: 2, DM: 3, CM: 4, AM: 5, RW: 6, LW: 6, ST: 7 }
 const ADJ: [Pos, Pos, number][] = [
-  ['CB', 'DM', 5], ['CB', 'RB', 6], ['CB', 'LB', 6], ['RB', 'LB', 3], ['RB', 'RW', 6], ['LB', 'LW', 6],
-  ['DM', 'CM', 3], ['CM', 'AM', 4], ['AM', 'RW', 4], ['AM', 'LW', 4], ['AM', 'ST', 5], ['RW', 'LW', 2],
-  ['RW', 'ST', 5], ['LW', 'ST', 5], ['DM', 'RB', 7], ['DM', 'LB', 7], ['CM', 'RW', 7], ['CM', 'LW', 7],
+  ['CB', 'DM', 3], ['CB', 'RB', 4], ['CB', 'LB', 4], ['RB', 'LB', 2], ['RB', 'RW', 4], ['LB', 'LW', 4],
+  ['DM', 'CM', 1], ['CM', 'AM', 2], ['AM', 'RW', 2], ['AM', 'LW', 2], ['AM', 'ST', 3], ['RW', 'LW', 1],
+  ['RW', 'ST', 2], ['LW', 'ST', 2], ['DM', 'RB', 5], ['DM', 'LB', 5], ['CM', 'RW', 4], ['CM', 'LW', 4], ['DM', 'AM', 4],
 ]
+/** Familiarity cost of playing `at` for someone natural in `natural`: 0 at home, 1–5 for neighbouring roles, 10 otherwise. */
 export function positionPenalty(natural: Pos[], at: Pos): number {
   if (natural.includes(at)) return 0
-  let best = at === 'GK' || natural[0] === 'GK' ? 40 : 12
+  let best = at === 'GK' || natural[0] === 'GK' ? 40 : 10
   for (const n of natural) {
-    if (GROUP[n] === GROUP[at]) best = Math.min(best, 2)
+    if (GROUP[n] === GROUP[at]) best = Math.min(best, 1)
     for (const [a, b, c] of ADJ) if ((a === n && b === at) || (b === n && a === at)) best = Math.min(best, c)
   }
   return best
 }
+/**
+ * Overall when played at `at`. In a natural position it is the attribute fit for that role. In a neighbouring
+ * role a good footballer keeps most of his level: the rating blends his natural overall with how his attributes
+ * suit the new role, less a small familiarity cost. Unrelated roles fall back to the raw attribute fit.
+ */
 export function effectiveOverall(attrs: ArrayLike<number>, natural: Pos[], at: Pos): number {
-  return overallAt(attrs, at) - positionPenalty(natural, at)
+  const fit = overallAt(attrs, at)
+  if (natural.includes(at)) return fit
+  const pen = positionPenalty(natural, at)
+  if (pen > 5) return fit - pen
+  const home = overallAt(attrs, natural[0])
+  return Math.round(Math.max(fit, 0.4 * fit + 0.6 * home) - pen)
 }
 
 export interface FaceStats { labels: string[]; values: number[] }

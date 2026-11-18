@@ -125,6 +125,13 @@ export function buildWorld(raw: RawData, seed: number, managerName: string, over
       const floor = nat.level - 7 + Math.min(8, Math.sqrt(caps) * 0.9) + prng.normal(0, 1.6) - (age > 33 ? (age - 33) * 1.5 : 0)
       est = Math.max(est, floor)
     }
+    // a real market value is strong evidence of level: pull the estimate toward what that value implies
+    if (r.valueEur && r.valueEur > 20_000) {
+      const ageF = age <= 21 ? 0.85 + (21 - age) * 0.02 : age <= 26 ? 1 : age <= 29 ? 1 - (age - 26) * 0.1 : age <= 33 ? 0.7 - (age - 29) * 0.13 : Math.max(0.04, 0.18 - (age - 33) * 0.05)
+      const lgF = 0.45 + 0.55 * ((lg?.strength ?? 45) / 90)
+      const implied = 70 + Math.log(r.valueEur / (2_500_000 * ageF * lgF * (age < 24 ? 1.3 : 1))) / 0.2
+      est = est * 0.45 + clamp(implied, est - 9, est + 9) * 0.55
+    }
     return est
   }
   for (const r of raw.players) {

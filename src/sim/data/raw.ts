@@ -98,3 +98,25 @@ export interface RawData {
   nations: RawNation[]
   staff: RawStaff[]
 }
+
+/** Supplement gathered from FotMob, merged over the base dataset when a career is created. */
+export interface RawExtra {
+  version: number
+  players: RawPlayer[]
+  /** Corrections to existing players, keyed by player id. */
+  patches: Record<string, Partial<RawPlayer>>
+  clubs: RawClub[]
+  leagues: RawLeague[]
+}
+export function mergeExtra(raw: RawData, extra?: RawExtra | null): RawData {
+  if (!extra) return raw
+  const haveL = new Set(raw.leagues.map((l) => l.id))
+  const haveC = new Set(raw.clubs.map((c) => c.id))
+  const haveP = new Set(raw.players.map((p) => p.id))
+  return {
+    ...raw,
+    leagues: [...raw.leagues, ...extra.leagues.filter((l) => !haveL.has(l.id))],
+    clubs: [...raw.clubs, ...extra.clubs.filter((c) => !haveC.has(c.id))],
+    players: [...raw.players.map((p) => (extra.patches[p.id] ? { ...p, ...extra.patches[p.id] } : p)), ...extra.players.filter((p) => !haveP.has(p.id))],
+  }
+}

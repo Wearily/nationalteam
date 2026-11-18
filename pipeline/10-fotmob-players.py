@@ -1,0 +1,231 @@
+"""Real player records from FotMob: Iranian club squads, Iran national teams and Iranians abroad.
+Writes public/data/fotmob.json {players, patches, clubs, leagues} which the game merges over world.json,
+and extends data/overrides/photos.json and logos.json.
+Usage: python3 -I pipeline/10-fotmob-players.py <cache-dir>"""
+import difflib, glob, json, os, re, subprocess, sys, time, unicodedata, urllib.parse, collections
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+CACHE = os.path.join(sys.argv[1], 'fm'); os.makedirs(CACHE, exist_ok=True)
+UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36'
+def get(url, out, binary=False):
+    if os.path.exists(out) and os.path.getsize(out) > (500 if binary else 20): return True
+    r = subprocess.run(['curl', '-sS', '-m', '25', '-A', UA, '-o', out, '-w', '%{http_code}', url], capture_output=True, text=True)
+    time.sleep(0.3)
+    ok = r.stdout.strip() == '200' and os.path.exists(out)
+    if not ok and os.path.exists(out): os.remove(out)
+    return ok
+def js(url, name):
+    f = os.path.join(CACHE, name)
+    if not get(url, f): return None
+    try: return json.load(open(f))
+    except Exception: return None
+def norm(s):
+    s = unicodedata.normalize('NFKD', s).encode('ascii', 'ignore').decode().lower()
+    s = re.sub(r'[^a-z ]', ' ', s)
+    s = s.replace('mohammed', 'mohammad').replace('hossain', 'hossein').replace('hussein', 'hossein').replace('seyed ', '').replace('seyyed ', '').replace('sayed ', '')
+    s = re.sub(r'(.)\1', r'\1', s)
+    s = s.replace('ou', 'u').replace('oo', 'u').replace('ee', 'i').replace('y', 'i').replace('gh', 'q').replace('kh', 'k')
+    return ' '.join(s.split())
+squash = lambda s: norm(s).replace(' ', '')
+def sim(a, b): return max(difflib.SequenceMatcher(None, a, b).ratio(), difflib.SequenceMatcher(None, a.replace(' ', ''), b.replace(' ', '')).ratio())
+def search(term):
+    key = re.sub(r'[^a-z0-9]+', '-', term.lower())
+    return js('https://www.fotmob.com/api/data/search/suggest?term=' + urllib.parse.quote(term) + '&lang=en', f'search-p-{key}.json') or []
+POS = {'GK': 'GK', 'CB': 'CB', 'RB': 'RB', 'RWB': 'RB', 'LB': 'LB', 'LWB': 'LB', 'CDM': 'DM', 'DM': 'DM', 'CM': 'CM', 'CAM': 'AM', 'AM': 'AM', 'RM': 'RW', 'RW': 'RW', 'LM': 'LW', 'LW': 'LW', 'ST': 'ST', 'CF': 'ST'}
+ROLE = {'keeper_long': 'GK', 'defender_long': 'CB', 'midfielder_long': 'CM', 'attacker_long': 'ST'}
+def positions(descs, role=None):
+    out = []
+    for d in descs:
+        p = POS.get(d.strip().upper())
+        if p and p not in out: out.append(p)
+    if not out and role in ROLE: out = [ROLE[role]]
+    return out[:3]
+
+world = json.load(open(os.path.join(ROOT, 'public/data/world.json')))
+nations = {n['code'] for n in world['nations']}
+ALIAS = {'SGP': 'SGP', 'SIN': 'SGP', 'IRI': 'IRN', 'UAE': 'UAE', 'ARE': 'UAE', 'SAU': 'KSA', 'DEU': 'GER', 'NLD': 'NED', 'PRT': 'POR', 'HRV': 'CRO', 'CHE': 'SUI', 'DNK': 'DEN', 'GRC': 'GRE', 'INT': None}
+def nat_code(c):
+    if not c: return None
+    c = str(c).upper()
+    if c in nations: return c
+    a = ALIAS.get(c)
+    return a if a in nations else None
+leagues = {l['id']: l for l in world['leagues']}
+clubs = list(world['clubs'])
+by_country = collections.defaultdict(list)
+for c in clubs: by_country[c['country']].append(c)
+wplayers = world['players']
+by_club = collections.defaultdict(list)
+for p in wplayers:
+    if p.get('club'): by_club[p['club']].append(p)
+iranians = [p for p in wplayers if 'IRN' in p['nat']]
+
+new_clubs, new_leagues, club_of_fm = [], [], {}
+def map_club(tid, tname, country, league_hint=None):
+    """FotMob team -> game club id (existing by name within country, else a new club)."""
+    if tid in club_of_fm: return club_of_fm[tid]
+    best, bs = None, 0
+    for c in by_country.get(country, []):
+        s_ = max(sim(norm(c['name']), norm(tname)), sim(norm(c.get('short') or c['name']), norm(tname)))
+        if c['league'].startswith('other-'): s_ -= 0.03
+        if s_ > bs: best, bs = c, s_
+    if best and bs >= 0.8: club_of_fm[tid] = best['id']; return best['id']
+    lid = league_hint or f'other-{country.lower()}'
+    if lid not in leagues:
+        leagues[lid] = {'id': lid, 'name': f'{country} — other clubs', 'country': country, 'tier': 1, 'strength': 50, 'startMonth': 8}
+        new_leagues.append(leagues[lid])
+    c = {'id': f'fm-{tid}', 'name': tname, 'country': country, 'league': lid, 'rep': leagues[lid]['strength']}
+    clubs.append(c); by_country[country].append(c); new_clubs.append(c)
+    club_of_fm[tid] = c['id']
+    return c['id']
+
+fm = {}  # fotmob id -> dict(name, dob, pos, height, value, num, nat, club, natteam)
+def team(tid, league_hint=None, national=False):
+    d = js(f'https://www.fotmob.com/api/data/teams?id={tid}', f'team-{tid}.json')
+    if not d: return None
+    det = d.get('details') or {}
+    country = nat_code(det.get('country'))
+    cid = None if national else (map_club(tid, det.get('name', ''), country, league_hint) if country else None)
+    for g in ((d.get('squad') or {}).get('squad') or []):
+        if g.get('title') == 'coach': continue
+        for m in (g.get('members') or []):
+            e = fm.setdefault(m['id'], {'id': m['id'], 'name': m['name']})
+            e.update({k: v for k, v in {'dob': m.get('dateOfBirth'), 'height': m.get('height'), 'value': m.get('transferValue'), 'num': m.get('shirtNumber')}.items() if v})
+            pos = positions((m.get('positionIdsDesc') or '').split(','), (m.get('role') or {}).get('key'))
+            if pos: e['pos'] = pos
+            if national: e['nat'] = 'IRN'
+            else:
+                e['club'] = cid
+                n = nat_code(m.get('ccode'))
+                if n: e.setdefault('nat', n)
+    return det
+
+def teams_in(obj, out):
+    if isinstance(obj, dict):
+        if 'id' in obj and 'name' in obj and ('shortName' in obj or 'pageUrl' in obj) and str(obj['id']).isdigit(): out[int(obj['id'])] = obj['name']
+        for v in obj.values(): teams_in(v, out)
+    elif isinstance(obj, list):
+        for v in obj: teams_in(v, out)
+# 1. Iranian leagues
+league_ids = {523: 'irn-1'}
+for grp in (js('https://www.fotmob.com/api/data/search/suggest?term=Azadegan&lang=en', 'search-azadegan.json') or []):
+    for it in grp.get('suggestions', []):
+        if it.get('type') == 'league': league_ids[int(it['id'])] = 'irn-2'
+iran_team_ids = set(); moved = {}
+for lid, ours in league_ids.items():
+    d = js(f'https://www.fotmob.com/api/data/leagues?id={lid}', f'league-{lid}.json')
+    if not d: continue
+    t = {}; teams_in(d.get('table'), t)
+    for tid in t: iran_team_ids.add(tid); team(tid, ours)
+    for tr in ((d.get('transfers') or {}).get('data') or []):
+        if tr.get('fromClubId') in t and tr.get('toClubId') not in t and tr.get('playerId'): moved[tr['playerId']] = tr.get('name')
+# 2. national teams
+nts = {6711}
+for grp in (js('https://www.fotmob.com/api/data/search/suggest?term=Iran&lang=en', 'search-iran.json') or []):
+    for it in grp.get('suggestions', []):
+        if it.get('type') == 'team' and re.match(r'Iran( U\d+)?$', it.get('name', '')): nts.add(int(it['id']))
+for tid in nts: team(tid, national=True)
+print('squads read:', len(fm), 'players;', len(iran_team_ids), 'Iranian clubs;', len(nts), 'national teams')
+
+# 3. Iranians abroad: seed names, existing Iranians without an Iranian club, and players transferred out
+lookups = {}
+for line in open(os.path.join(ROOT, 'pipeline/iranians-abroad.seed.txt')):
+    line = line.strip()
+    if line and not line.startswith('#'): lookups[line] = None
+iran_club_ids = {c['id'] for c in world['clubs'] if c['country'] == 'IRN'}
+for p in iranians:
+    if p.get('club') not in iran_club_ids: lookups.setdefault(p['name'], p)
+want = set(moved)
+for name in lookups:
+    cand = [it for grp in search(name) for it in grp.get('suggestions', []) if it.get('type') == 'player']
+    for it in cand[:3]:
+        if sim(norm(it.get('name', '')), norm(name)) >= 0.86: want.add(int(it['id'])); break
+have_nt_abroad = [i for i, e in fm.items() if e.get('nat') == 'IRN' and 'club' not in e]
+want |= set(have_nt_abroad)
+def player(pid):
+    d = js(f'https://www.fotmob.com/api/data/playerData?id={pid}', f'player-{pid}.json')
+    if not d or d.get('isCoach'): return
+    info = {i.get('title'): i for i in (d.get('playerInformation') or [])}
+    country = nat_code((info.get('Country') or {}).get('countryCode'))
+    e = fm.setdefault(pid, {'id': pid, 'name': d.get('name', '')})
+    if (d.get('birthDate') or {}).get('utcTime'): e['dob'] = d['birthDate']['utcTime'][:10]
+    hv = ((info.get('Height') or {}).get('value') or {}).get('numberValue')
+    if hv: e['height'] = hv
+    mv = ((info.get('Market value') or {}).get('value') or {}).get('numberValue')
+    if mv: e['value'] = mv
+    sh = ((info.get('Shirt') or {}).get('value') or {}).get('numberValue')
+    if sh: e['num'] = sh
+    ft = ((info.get('Preferred foot') or {}).get('value') or {}).get('key')
+    if ft in ('left', 'right', 'both'): e['foot'] = ft[0].upper()
+    ps = sorted((d.get('positionDescription') or {}).get('positions') or [], key=lambda x: (-int(bool(x.get('isMainPosition'))), -(x.get('occurences') or 0)))
+    pos = positions([(x.get('strPosShort') or {}).get('label', '') for x in ps])
+    if pos: e['pos'] = pos
+    if country: e['nat'] = country
+    pt = d.get('primaryTeam') or {}
+    if pt.get('teamId') and 'club' not in e:
+        tid = pt['teamId']
+        if tid in club_of_fm: e['club'] = club_of_fm[tid]
+        else:
+            td = js(f'https://www.fotmob.com/api/data/teams?id={tid}', f'team-{tid}.json') or {}
+            tc = nat_code((td.get('details') or {}).get('country'))
+            if tc and not (td.get('details') or {}).get('type') == 'national': e['club'] = map_club(tid, pt.get('teamName', ''), tc)
+for pid in sorted(want): player(pid)
+print('looked up individually:', len(want))
+
+# 4. match to existing records -> patches, else new players
+def find_existing(e):
+    n = norm(e['name']); best, bs = None, 0
+    pool = iranians if e.get('nat') == 'IRN' else by_club.get(e.get('club') or '', []) + [p for p in wplayers if p['nat'][0] == e.get('nat')][:0]
+    for p in pool:
+        s_ = sim(n, norm(p['name']))
+        if e.get('dob') and p.get('dob') == e['dob']: s_ += 0.25
+        elif e.get('dob') and p.get('dob') and p['dob'][:4] != e['dob'][:4] and not p['dob'].endswith('-07-01'): s_ -= 0.2
+        if s_ > bs: best, bs = p, s_
+    return best if bs >= 0.9 else None
+patches, players, skipped = {}, [], collections.Counter()
+photos_path = os.path.join(ROOT, 'data/overrides/photos.json'); photos = json.load(open(photos_path))
+os.makedirs(os.path.join(ROOT, 'public/faces/fm'), exist_ok=True)
+def face(pid_game, fid):
+    if pid_game in photos: return
+    out = os.path.join(ROOT, 'public/faces/fm', pid_game.replace(':', '_') + '.png')
+    if get(f'https://images.fotmob.com/image_resources/playerimages/{fid}.png', out, True) and open(out, 'rb').read(4) == b'\x89PNG' and os.path.getsize(out) > 2500: photos[pid_game] = 'faces/fm/' + os.path.basename(out)
+    elif os.path.exists(out): os.remove(out)
+seen = set()
+for e in fm.values():
+    if not e.get('nat'): skipped['no nationality'] += 1; continue
+    ex = find_existing(e)
+    if ex:
+        if ex['id'] in seen: continue
+        seen.add(ex['id'])
+        patch = {}
+        if e.get('dob') and e['dob'] != ex.get('dob'): patch['dob'] = e['dob']
+        if e.get('pos'): patch['pos'] = e['pos']
+        if e.get('height'): patch['heightCm'] = e['height']
+        if e.get('foot'): patch['foot'] = e['foot']
+        if e.get('club') and e['club'] != ex.get('club'): patch['club'] = e['club']
+        if e.get('value'): patch['valueEur'] = int(e['value'])
+        if e.get('num'): patch['num'] = e['num']
+        if patch: patches[ex['id']] = patch
+        face(ex['id'], e['id'])
+        continue
+    if not e.get('dob'): skipped['no birth date'] += 1; continue
+    if not e.get('pos'): skipped['no position'] += 1; continue
+    rec = {'id': f"fm:{e['id']}", 'name': e['name'], 'dob': e['dob'], 'nat': [e['nat']], 'pos': e['pos'], 'club': e.get('club'), 'src': 'fotmob'}
+    if e.get('height'): rec['heightCm'] = e['height']
+    if e.get('foot'): rec['foot'] = e['foot']
+    if e.get('value'): rec['valueEur'] = int(e['value'])
+    if e.get('num'): rec['num'] = e['num']
+    players.append(rec); face(rec['id'], e['id'])
+json.dump(photos, open(photos_path, 'w'), indent=0, sort_keys=True)
+json.dump({'version': 1, 'players': players, 'patches': patches, 'clubs': new_clubs, 'leagues': new_leagues}, open(os.path.join(ROOT, 'public/data/fotmob.json'), 'w'), separators=(',', ':'))
+ir_new = [p for p in players if p['nat'][0] == 'IRN']
+abroad = collections.Counter()
+cc = {c['id']: c['country'] for c in clubs}
+for p in ir_new + [x for x in iranians if x['id'] in patches and patches[x['id']].get('club')]:
+    cl = p.get('club') if p in ir_new else patches[p['id']]['club']
+    if cl and cc.get(cl) != 'IRN': abroad[cc.get(cl)] += 1
+print('new players', len(players), '(Iranian', len(ir_new), ') patched', len(patches), 'new clubs', len(new_clubs), 'new leagues', len(new_leagues), 'photos now', len(photos))
+print('club moves abroad (new or corrected):', dict(abroad.most_common(15)))
+print('skipped:', dict(skipped))
+for q in ('hoseinnejad', 'saiadmanesh'):
+    hit = [(p['name'], p.get('club')) for p in players if q in squash(p['name'])] + [(x['name'], patches[x['id']].get('club', x.get('club'))) for x in wplayers if x['id'] in patches and q in squash(x['name'])]
+    print(q, hit)

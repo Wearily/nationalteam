@@ -1,15 +1,15 @@
 import * as Comlink from 'comlink'
 import overrides from '../../data/overrides/ratings.json'
 import { Game } from '../sim/game'
-import type { RawData } from '../sim/data/raw'
+import type { RawData, RawExtra } from '../sim/data/raw'
 import type { World } from '../sim/world/state'
 
 let game: Game | null = null
 const CMDS = new Set(['announceSquad', 'assignScout', 'hireCoach', 'approach', 'setControl', 'setTactic', 'setBudget', 'markRead', 'suggestSquad', 'arrangeFriendly', 'bookFriendly', 'cancelFriendly'])
 
 const api = {
-  newGame(raw: RawData, seed: number, name: string): World {
-    game = Game.create(raw, seed, name, overrides as unknown as Record<string, [number, number] | string>)
+  newGame(raw: RawData, seed: number, name: string, extra?: RawExtra | null): World {
+    game = Game.create(raw, seed, name, overrides as unknown as Record<string, [number, number] | string>, extra)
     return game.w
   },
   load(w: World) { game = new Game(w); return true },

@@ -1,7 +1,7 @@
 import { fmtDay, toDay, ymd, type Day } from './core/date'
 import { Rng, clamp } from './core/rng'
 import { A } from './ratings/attributes'
-import type { RawData } from './data/raw'
+import { mergeExtra, type RawData, type RawExtra } from './data/raw'
 import { developAll, revalue, seasonRollover } from './career/develop'
 import { seasonYearFor, simClubFixture, startLeagueSeason } from './clubs/season'
 import { transferWeek } from './clubs/transfers'
@@ -38,8 +38,8 @@ export class Game {
     this.idx = buildIndex(w)
   }
 
-  static create(raw: RawData, seed: number, name: string, overrides: Record<string, [number, number] | string> = {}): Game {
-    const g = new Game(buildWorld(raw, seed, name, overrides))
+  static create(raw: RawData, seed: number, name: string, overrides: Record<string, [number, number] | string> = {}, extra?: RawExtra | null): Game {
+    const g = new Game(buildWorld(mergeExtra(raw, extra), seed, name, overrides))
     g.init()
     return g
   }

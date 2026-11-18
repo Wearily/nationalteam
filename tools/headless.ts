@@ -5,7 +5,8 @@ import { synthRaw } from './synthRaw'
 const days = +(process.argv[2] ?? 120)
 const raw = existsSync('public/data/world.json') && process.argv[3] !== 'synth' ? JSON.parse(readFileSync('public/data/world.json', 'utf8')) : synthRaw()
 let t0 = Date.now()
-const g = Game.create(raw, 12345, 'Tester')
+const extra = existsSync('public/data/fotmob.json') && process.argv[3] !== 'synth' ? JSON.parse(readFileSync('public/data/fotmob.json', 'utf8')) : null
+const g = Game.create(raw, 12345, 'Tester', JSON.parse(readFileSync('data/overrides/ratings.json', 'utf8')), extra)
 console.log(`created in ${Date.now() - t0}ms: players ${g.w.players.length}, clubs ${g.w.clubs.length}, fixtures ${g.w.fixtures.length}, comps ${g.w.comps.length}, Iran rank ${g.w.nations.IRN.rank}`)
 for (const t of Object.values(g.w.teams)) t.control = 'auto'
 t0 = Date.now()

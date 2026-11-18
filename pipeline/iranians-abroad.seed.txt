@@ -1,0 +1,51 @@
+# Iranian (or Iran-eligible) players to look up on FotMob by name, one per line.
+Mohammad Javad Hosseinnejad
+Allahyar Sayyadmanesh
+Mehdi Taremi
+Sardar Azmoun
+Alireza Jahanbakhsh
+Saman Ghoddos
+Milad Mohammadi
+Majid Hosseini
+Ali Gholizadeh
+Mohammad Mohebi
+Saeid Ezatolahi
+Mehdi Ghayedi
+Amirhossein Hosseinzadeh
+Yasin Salmani
+Dennis Eckert
+Ali Karimi
+Omid Noorafkan
+Kaveh Rezaei
+Shahab Zahedi
+Arya Yousefi
+Kasra Taheri
+Reza Shekari
+Younes Delfi
+Hossein Abarghouei
+Mohammad Amin Hazbavi
+Sadegh Moharrami
+Morteza Pouraliganji
+Karim Ansarifard
+Amir Abedzadeh
+Mohammad Naderi
+Milad Sarlak
+Aref Gholami
+Mehrdad Mohammadi
+Ahmad Nourollahi
+Mohammad Karimi
+Mohammad Reza Azadi
+Ali Nemati
+Shahriar Moghanlou
+Hossein Tayebi
+Mohammad Ghorbani
+Amirhossein Mahmoudi
+Alireza Koushki
+Saeid Saharkhizan
+Farshad Faraji
+Mohammad Daneshgar
+Hadi Habibinejad
+Mohammad Mehdi Zare
+Abolfazl Zamani
+Erfan Shahriari
+Mohammad Askari

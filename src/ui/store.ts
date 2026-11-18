@@ -1,7 +1,7 @@
 import * as Comlink from 'comlink'
 import { openDB } from 'idb'
 import { create } from 'zustand'
-import type { RawData } from '../sim/data/raw'
+import type { RawData, RawExtra } from '../sim/data/raw'
 import type { AdvanceResult } from '../sim/game'
 import type { World } from '../sim/world/state'
 import type { SimApi } from '../worker/sim.worker'
@@ -49,7 +49,8 @@ export const useGame = create<State>((set, get) => ({
   newGame: async (name) => {
     set({ busy: 'Building the football world…' })
     const raw = (await (await fetch(`${import.meta.env.BASE_URL}data/world.json`)).json()) as RawData
-    const w = await sim.newGame(raw, Math.floor(Math.random() * 2 ** 31), name)
+    const extra = (await fetch(`${import.meta.env.BASE_URL}data/fotmob.json`).then((r) => (r.ok ? r.json() : null)).catch(() => null)) as RawExtra | null
+    const w = await sim.newGame(raw, Math.floor(Math.random() * 2 ** 31), name, extra)
     get().setWorld(w)
     set({ busy: null, route: { name: 'home' } })
   },
