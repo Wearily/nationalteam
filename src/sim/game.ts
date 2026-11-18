@@ -1,5 +1,6 @@
 import { fmtDay, toDay, ymd, type Day } from './core/date'
 import { Rng, clamp } from './core/rng'
+import { A } from './ratings/attributes'
 import type { RawData } from './data/raw'
 import { developAll, revalue, seasonRollover } from './career/develop'
 import { seasonYearFor, simClubFixture, startLeagueSeason } from './clubs/season'
@@ -394,7 +395,7 @@ export class Game {
         s.yellows += st.yellow; s.reds += st.red
         if (!st.subOn) s.starts++
         if (level === 'senior') { p.caps++; p.goals += st.goals; if (competitive) p.capTied = true } else p.youthCaps[level] = (p.youthCaps[level] ?? 0) + 1
-        p.cond = clamp(sim.energy[t][i] - 12, 35, 100)
+        p.cond = clamp(sim.energy[t][i] - 10 - (st.mins / 90) * 8, 30, 100)
         p.sharp = Math.min(100, p.sharp + (st.mins / 90) * 8)
         if (p.nat[0] === 'IRN') p.morale = clamp(p.morale + (st.rating - 6.6) * 4, 0, 100)
       })
@@ -600,7 +601,8 @@ export class Game {
     const { y, m, d, dow } = ymd(w.day)
     for (const p of w.players) {
       if (p.retired) continue
-      if (p.cond < 100) p.cond = Math.min(100, p.cond + 7)
+      // daily recovery: fitter players bounce back faster, older legs take longer
+      if (p.cond < 100) p.cond = Math.min(100, p.cond + 4.6 + p.attrs[A.stamina] / 36 - Math.max(0, (w.day - p.dob) / 365.25 - 30) * 0.3)
       if (p.injury && p.injury.until <= w.day) p.injury = null
     }
     for (const t of Object.values(w.teams)) {

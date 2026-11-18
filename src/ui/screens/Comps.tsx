@@ -114,7 +114,7 @@ function SlotRow({ level, day, window, nations }: { level: Level; day: number; w
   const fee = n ? Math.max(0, Math.round(((n.level - 62) * 45_000) / 10_000) * 10_000) * (level === 'senior' ? 1 : 0.15) : 0
   return (
     <div className="row" style={{ padding: '3px 0' }} title={`${window} window`}>
-      <span className="num" style={{ width: 54, fontSize: 13 }}>{fmtDay(day, false)}</span><span className="pill">{LEVEL_NAME[level]}</span>
+      <span className="num" style={{ width: 86, fontSize: 13 }}>{fmtDay(day, ymd(day).y !== ymd(w!.day).y)}</span><span className="pill">{LEVEL_NAME[level]}</span>
       <select className="input grow" value={opp} onChange={(e) => setOpp(e.target.value)}><option value="">Choose opponent…</option>{nations.map((x) => <option key={x.code} value={x.code}>#{x.rank} {x.name}</option>)}</select>
       <div className="seg"><button className={home ? 'on' : ''} onClick={() => setHome(true)}>H</button><button className={!home ? 'on' : ''} onClick={() => setHome(false)}>A</button></div>
       <button className="btn sm primary" disabled={!opp} onClick={() => void cmd<string>('bookFriendly', level, day, opp, home).then(notify)}>{fee ? `Book · €${Math.round(fee / 1000)}K` : 'Book'}</button>
@@ -152,7 +152,7 @@ export function Calendar() {
           {slots.slice(0, 10).map((sl) => <SlotRow key={`${sl.level}${sl.day}`} level={sl.level} day={sl.day} window={sl.window} nations={nations} />)}
           {friendlies.length > 0 && <div className="eyebrow" style={{ marginTop: 6 }}>Booked</div>}
           {friendlies.map((f) => { const home = f.home.startsWith('n:IRN:'); const opp = (home ? f.away : f.home).split(':')[1]; return (
-            <div key={f.id} className="row" style={{ padding: '3px 0' }}><span className="num" style={{ width: 54, fontSize: 13 }}>{fmtDay(f.day, false)}</span><span className="pill">{LEVEL_NAME[f.home.split(':')[2] as 'u23']} · {home ? 'H' : 'A'}</span>
+            <div key={f.id} className="row" style={{ padding: '3px 0' }}><span className="num" style={{ width: 86, fontSize: 13 }}>{fmtDay(f.day, ymd(f.day).y !== ymd(world.day).y)}</span><span className="pill">{LEVEL_NAME[f.home.split(':')[2] as 'u23']} · {home ? 'H' : 'A'}</span>
               <select className="input grow" value={opp} onChange={(e) => void cmd<string>('arrangeFriendly', f.id, e.target.value).then(notify)}>{nations.map((n) => <option key={n.code} value={n.code}>#{n.rank} {n.name}</option>)}</select>
               <button className="btn sm danger" onClick={() => void cmd<string>('cancelFriendly', f.id).then(notify)}>Cancel</button></div>
           ) })}

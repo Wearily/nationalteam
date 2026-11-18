@@ -26,6 +26,7 @@ export function TacticsEditor({ tactic, squad, onChange, energy, locked, compact
   const slots = FORMATIONS[tactic.formation]
   const byId = useMemo(() => new Map(squad.map((p) => [p.id, p])), [squad])
   const bench = squad.filter((p) => !tactic.lineup.includes(p.id))
+  const tired = tactic.lineup.map((id) => byId.get(id)).filter((p): p is Player => !!p && p.cond < 82)
   const set = (patch: Partial<Tactic>) => onChange({ ...tactic, ...patch })
   const changeFormation = (f: string) => {
     const xi = pickXI(tactic.lineup.map((id) => byId.get(id)).filter(Boolean) as Player[], f)
@@ -53,6 +54,7 @@ export function TacticsEditor({ tactic, squad, onChange, energy, locked, compact
     <div className="grid" style={{ gridTemplateColumns: compact ? '460px 1fr' : '500px minmax(0,1fr) 300px', alignItems: 'start' }}>
       <div className="col">
         <div className="row"><select className="input grow" value={tactic.formation} onChange={(e) => changeFormation(e.target.value)}>{FORMATION_KEYS.map((f) => <option key={f}>{f}</option>)}</select></div>
+        {!energy && tired.length > 0 && <div className="pill amber" style={{ height: 'auto', padding: '7px 11px', whiteSpace: 'normal', borderRadius: 10, lineHeight: 1.35 }}>{tired.length} starter{tired.length === 1 ? ' is' : 's are'} not fully recovered ({tired.slice(0, 4).map((x) => `${x.name.split(' ').slice(-1)[0]} ${Math.round(x.cond)}%`).join(', ')}). Tired players fade late in matches and get injured more easily.</div>}
         <div className="board">
           <svg className="lines" viewBox="0 0 68 100" preserveAspectRatio="none" fill="none" stroke="rgba(255,255,255,0.28)" strokeWidth="0.3">
             <rect x="2" y="2" width="64" height="96" /><line x1="2" y1="50" x2="66" y2="50" /><circle cx="34" cy="50" r="8" /><rect x="16" y="2" width="36" height="15" /><rect x="16" y="83" width="36" height="15" /><rect x="25" y="2" width="18" height="5.5" /><rect x="25" y="92.5" width="18" height="5.5" />
@@ -60,7 +62,7 @@ export function TacticsEditor({ tactic, squad, onChange, energy, locked, compact
           {slots.map((s, i) => {
             const p = byId.get(tactic.lineup[i])
             const eff = p ? effectiveOverall(p.attrs, p.pos, s.pos) + dynOvr(p).total : 0
-            const e = p && energy ? energy[p.id] : undefined
+            const e = p ? (energy ? energy[p.id] : p.cond) : undefined
             return (
               <div key={i} className={`slot ${sel === i ? 'sel' : ''}`} style={{ left: `${9 + s.y * 82}%`, top: `${90 - s.x * 100}%` }} onClick={() => clickSlot(i)}>
                 <div className="pcard">
@@ -94,7 +96,7 @@ export function TacticsEditor({ tactic, squad, onChange, energy, locked, compact
                 <td><span className="row" style={{ gap: 4 }}>{p.pos.slice(0, 2).map((x) => <PosTag key={x} pos={x} />)}</span></td>
                 <td className="c"><Ovr p={p} /></td>
                 <td className="c num">{selSlot ? effectiveOverall(p.attrs, p.pos, selSlot.pos) : '–'}</td>
-                <td className="c num">{Math.round(p.cond)}%</td><td className="c num">{Math.round(p.sharp)}%</td>
+                <td className="c num" style={{ color: p.cond < 65 ? '#ff7a82' : p.cond < 82 ? '#f2c46d' : undefined, fontWeight: p.cond < 82 ? 700 : undefined }}>{Math.round(p.cond)}%</td><td className="c num">{Math.round(p.sharp)}%</td>
               </tr>
             )
           })}
