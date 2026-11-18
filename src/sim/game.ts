@@ -1,6 +1,6 @@
 import { fmtDay, toDay, ymd, type Day } from './core/date'
 import { Rng, clamp } from './core/rng'
-import { A } from './ratings/attributes'
+import { A, fitToOverall, overallAt } from './ratings/attributes'
 import { mergeExtra, type RawData, type RawExtra } from './data/raw'
 import { developAll, revalue, seasonRollover } from './career/develop'
 import { seasonYearFor, simClubFixture, startLeagueSeason } from './clubs/season'
@@ -15,7 +15,7 @@ import type { Tactic } from './match/tactics'
 import type { Frame, MatchReport, MatchSnapshot, MEvent, ShotRec } from './match/types'
 import { buildWorld } from './world/build'
 import { buildIndex, type Camp, type Index, type Message, type NewsItem, type ScoutScope, type World } from './world/state'
-import { LEVEL_NAME, natRef, parseRef, type Fixture, type Level, type Player } from './world/types'
+import { LEVEL_NAME, natRef, parseRef, type Fixture, type Level, type Player, type Pos } from './world/types'
 
 export interface AdvanceResult {
   stop: 'squad' | 'match' | 'days' | 'news'
@@ -38,8 +38,8 @@ export class Game {
     this.idx = buildIndex(w)
   }
 
-  static create(raw: RawData, seed: number, name: string, overrides: Record<string, [number, number] | string> = {}, extra?: RawExtra | null): Game {
-    const g = new Game(buildWorld(mergeExtra(raw, extra), seed, name, overrides))
+  static create(raw: RawData, seed: number, name: string, overrides: Record<string, [number, number] | string> = {}, extra?: RawExtra | null, positions: Record<string, Pos[] | string> = {}): Game {
+    const g = new Game(buildWorld(mergeExtra(raw, extra), seed, name, overrides, positions))
     g.init()
     return g
   }
@@ -62,6 +62,24 @@ export class Game {
     this.idx = buildIndex(w)
     this.msg('board', `Welcome, ${w.managerName}`, `You have been elected head of the federation. The senior side is ranked ${w.nations.IRN.rank}${ordSuffix(w.nations.IRN.rank)} in the world and the ${ac.name} begins on ${fmtDay((ac.stages[0] as { days: Day[] }).days[0])}.\n\nBefore then come the 2027 international windows: the dates are open, and arranging the senior team's friendlies is up to you (Home → Calendar). The board expects a place in the semi-finals. You manage the senior team directly; the youth sides are run by their coaches unless you take control from the Teams screen.`, true)
     this.save()
+  }
+  /**
+   * Bring an existing career's players up to date with corrected positions (FotMob data and hand-set
+   * overrides). When a player's main position changes his attributes are refitted so his overall holds.
+   */
+  applyPositionFixes(extra: RawExtra | null | undefined, positions: Record<string, Pos[] | string>): number {
+    let n = 0
+    for (const p of this.w.players) {
+      if (!p.real || p.retired) continue
+      const hand = positions[p.name]
+      const next = Array.isArray(hand) ? hand : p.rid ? extra?.patches[p.rid]?.pos : undefined
+      if (!next?.length || next.join() === p.pos.join()) continue
+      if (next[0] !== p.pos[0] && (next[0] === 'GK') !== (p.pos[0] === 'GK')) continue
+      if (next[0] !== p.pos[0]) { const keep = p.ovr; p.attrs = fitToOverall([...p.attrs], next[0], keep); p.ovr = overallAt(p.attrs, next[0]) }
+      p.pos = [...next]
+      n++
+    }
+    return n
   }
   save() { this.w.rng = this.rng.s }
 

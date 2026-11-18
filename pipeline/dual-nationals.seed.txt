@@ -1,0 +1,5 @@
+# Uncapped players eligible for Iran through family, looked up on FotMob by name.
+# Format: Name | FIFA code of their other (current sporting) nation
+Aiden Hezarkhani | USA
+Arman Nahany | NED
+Xavi Gnaulati | USA

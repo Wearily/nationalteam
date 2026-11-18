@@ -57,8 +57,10 @@ export const useGame = create<State>((set, get) => ({
   resume: async () => {
     const w = await loadSaved()
     if (!w) return false
-    await sim.load(w)
-    set({ w })
+    const extra = (await fetch(`${import.meta.env.BASE_URL}data/fotmob.json`).then((r) => (r.ok ? r.json() : null)).catch(() => null)) as RawExtra | null
+    const fixed = await sim.load(w, extra)
+    set({ w: fixed })
+    void saveWorld(fixed)
     return true
   },
   cont: async (days = 31) => {

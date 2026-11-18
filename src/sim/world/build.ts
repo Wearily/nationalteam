@@ -78,7 +78,9 @@ function staffFrom(rng: Rng, id: number, o: Partial<Staff> & { name: string; dob
 
 const COLORS: [string, string][] = [['#c8102e', '#ffffff'], ['#0b3d91', '#ffffff'], ['#f5c400', '#111111'], ['#1b7f3b', '#ffffff'], ['#111111', '#ffffff'], ['#ffffff', '#c8102e'], ['#f26522', '#111111'], ['#5b2a86', '#ffffff'], ['#6ec1e4', '#0b1f33'], ['#7a0019', '#f5c400']]
 
-export function buildWorld(raw: RawData, seed: number, managerName: string, overrides: Record<string, [number, number] | string> = {}): World {
+export function buildWorld(raw: RawData, seed: number, managerName: string, overrides: Record<string, [number, number] | string> = {}, positions: Record<string, Pos[] | string> = {}): World {
+  const posFix = new Map<string, Pos[]>()
+  for (const [k, v] of Object.entries(positions)) if (Array.isArray(v)) posFix.set(k.toLowerCase(), v)
   const ov = new Map<string, [number, number]>()
   for (const [k, v] of Object.entries(overrides)) if (Array.isArray(v)) ov.set(k.toLowerCase(), v)
   const rng = new Rng(seed)
@@ -135,6 +137,8 @@ export function buildWorld(raw: RawData, seed: number, managerName: string, over
     return est
   }
   for (const r of raw.players) {
+    const pf = posFix.get(r.name.toLowerCase())
+    if (pf) r.pos = pf
     if (!r.dob || !r.pos?.length || !r.nat?.length || !nations[r.nat[0]]) continue
     // year-only birth dates: count the birthday as 1 January so the age ticks over at New Year
     const approx = !!r.dobYearOnly || r.dob.endsWith('-07-01')

@@ -1,18 +1,24 @@
 import * as Comlink from 'comlink'
+import positions from '../../data/overrides/positions.json'
 import overrides from '../../data/overrides/ratings.json'
 import { Game } from '../sim/game'
 import type { RawData, RawExtra } from '../sim/data/raw'
 import type { World } from '../sim/world/state'
+import type { Pos } from '../sim/world/types'
 
 let game: Game | null = null
 const CMDS = new Set(['announceSquad', 'assignScout', 'hireCoach', 'approach', 'setControl', 'setTactic', 'setBudget', 'markRead', 'suggestSquad', 'arrangeFriendly', 'bookFriendly', 'cancelFriendly'])
 
 const api = {
   newGame(raw: RawData, seed: number, name: string, extra?: RawExtra | null): World {
-    game = Game.create(raw, seed, name, overrides as unknown as Record<string, [number, number] | string>, extra)
+    game = Game.create(raw, seed, name, overrides as unknown as Record<string, [number, number] | string>, extra, positions as unknown as Record<string, Pos[] | string>)
     return game.w
   },
-  load(w: World) { game = new Game(w); return true },
+  load(w: World, extra?: RawExtra | null) {
+    game = new Game(w)
+    game.applyPositionFixes(extra, positions as unknown as Record<string, Pos[] | string>)
+    return game.w
+  },
   advance(days: number) {
     const r = game!.advance(days)
     return { r, w: game!.w }

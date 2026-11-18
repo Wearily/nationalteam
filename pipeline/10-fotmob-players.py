@@ -38,7 +38,7 @@ def positions(descs, role=None):
         p = POS.get(d.strip().upper())
         if p and p not in out: out.append(p)
     if not out and role in ROLE: out = [ROLE[role]]
-    return out[:3]
+    return out[:4]
 
 world = json.load(open(os.path.join(ROOT, 'public/data/world.json')))
 nations = {n['code'] for n in world['nations']}
@@ -149,6 +149,13 @@ lookups = {}
 for line in open(os.path.join(ROOT, 'pipeline/iranians-abroad.seed.txt')):
     line = line.strip()
     if line and not line.startswith('#'): lookups[line] = None
+duals = {}
+for line in open(os.path.join(ROOT, 'pipeline/dual-nationals.seed.txt')):
+    line = line.strip()
+    if line and not line.startswith('#') and '|' in line:
+        nm, code = [x.strip() for x in line.split('|')]
+        if code in nations: duals[nm] = code; lookups[nm] = None
+dual_ids = {}
 iran_club_ids = {c['id'] for c in world['clubs'] if c['country'] == 'IRN'}
 for p in iranians:
     if p.get('club') not in iran_club_ids: lookups.setdefault(p['name'], p)
@@ -156,7 +163,10 @@ want = set(moved)
 for name in lookups:
     cand = [it for grp in search(name) for it in grp.get('suggestions', []) if it.get('type') == 'player']
     for it in cand[:3]:
-        if sim(norm(it.get('name', '')), norm(name)) >= 0.86: want.add(int(it['id'])); break
+        if sim(norm(it.get('name', '')), norm(name)) >= 0.86:
+            want.add(int(it['id']))
+            if name in duals: dual_ids[int(it['id'])] = duals[name]
+            break
 have_nt_abroad = [i for i, e in fm.items() if e.get('nat') == 'IRN' and 'club' not in e]
 want |= set(have_nt_abroad)
 def player(pid):
@@ -187,6 +197,8 @@ def player(pid):
             tc = nat_code((td.get('details') or {}).get('country'))
             if tc and not (td.get('details') or {}).get('type') == 'national': e['club'] = map_club(tid, pt.get('teamName', ''), tc)
 for pid in sorted(want): player(pid)
+for pid, code in dual_ids.items():
+    if pid in fm: fm[pid]['nat'] = code; fm[pid]['dual'] = True
 print('looked up individually:', len(want))
 
 # 4. match to existing records -> patches, else new players
@@ -210,7 +222,7 @@ def face(pid_game, fid):
 seen = set()
 for e in fm.values():
     if not e.get('nat'): skipped['no nationality'] += 1; continue
-    ex = find_existing(e)
+    ex = None if e.get('dual') else find_existing(e)
     if ex:
         if ex['id'] in seen: continue
         seen.add(ex['id'])
@@ -227,7 +239,8 @@ for e in fm.values():
         continue
     if not e.get('dob'): skipped['no birth date'] += 1; continue
     if not e.get('pos'): skipped['no position'] += 1; continue
-    rec = {'id': f"fm:{e['id']}", 'name': e['name'], 'dob': e['dob'], 'nat': [e['nat']], 'pos': e['pos'], 'club': e.get('club'), 'src': 'fotmob'}
+    rec = {'id': f"fm:{e['id']}", 'name': e['name'], 'dob': e['dob'], 'nat': [e['nat'], 'IRN'] if e.get('dual') else [e['nat']], 'pos': e['pos'], 'club': e.get('club'), 'src': 'fotmob'}
+    if e.get('dual'): rec['born'] = e['nat']
     if e.get('height'): rec['heightCm'] = e['height']
     if e.get('foot'): rec['foot'] = e['foot']
     if e.get('value'): rec['valueEur'] = int(e['value'])
@@ -244,6 +257,7 @@ for p in ir_new + [x for x in iranians if x['id'] in patches and patches[x['id']
 print('new players', len(players), '(Iranian', len(ir_new), ') patched', len(patches), 'new clubs', len(new_clubs), 'new leagues', len(new_leagues), 'photos now', len(photos))
 print('club moves abroad (new or corrected):', dict(abroad.most_common(15)))
 print('skipped:', dict(skipped))
-for q in ('hoseinejad', 'saiadmanesh', 'jahanbaks', 'qodos'):
+print('dual nationals:', [(p['name'], p['nat'], p.get('club'), p['dob'], p['pos']) for p in players if len(p['nat']) > 1])
+for q in ('hoseinejad', 'saiadmanesh'):
     hit = [(p['name'], p.get('club')) for p in players if q in squash(p['name'])] + [(x['name'], patches[x['id']].get('club', x.get('club'))) for x in wplayers if x['id'] in patches and q in squash(x['name'])]
     print(q, hit)
