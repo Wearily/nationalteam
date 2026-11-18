@@ -419,6 +419,16 @@ export class Game {
         if (level === 'senior') { p.caps++; p.goals += st.goals; if (competitive) p.capTied = true } else p.youthCaps[level] = (p.youthCaps[level] ?? 0) + 1
         p.cond = clamp(sim.energy[t][i] - 10 - (st.mins / 90) * 8, 30, 100)
         p.sharp = Math.min(100, p.sharp + (st.mins / 90) * 8)
+        // tournament football is a shop window: standout displays put a player on foreign clubs' radar
+        if (competitive && st.mins >= 45) {
+          const stage = comp.weight >= 50 ? 1.6 : comp.weight >= 35 ? 1.2 : comp.weight >= 25 ? 0.5 : level === 'senior' ? 0.3 : 0.45
+          const gain = Math.min(1.6, (Math.max(0, st.rating - 7.0) * 1.0 + st.goals * 0.35 + st.assists * 0.2) * stage * (ko ? 1.25 : 1))
+          if (gain > 0.15) {
+            const before = p.spotlight ?? 0
+            p.spotlight = Math.min(10, before + gain)
+            if (before < 3 && p.spotlight >= 3 && p.nat[0] === 'IRN' && p.clubId != null) this.news('transfer', `${p.name} is attracting attention from clubs abroad after his performances at the ${comp.name}.`, p.id)
+          }
+        }
         // an international counts toward recent form like any other match (cameos of under 20 minutes do not)
         if (st.mins >= 20) { p.form.push(st.rating); if (p.form.length > 8) p.form.shift() }
         if (p.nat[0] === 'IRN') { p.morale = clamp(p.morale + (st.rating - 6.6) * 4, 0, 100); p.known = Math.min(100, p.known + 10 + (st.mins / 90) * 20) }
@@ -654,6 +664,7 @@ export class Game {
       }
     }
     if (d === 1) {
+      for (const pl of w.players) if (pl.spotlight) pl.spotlight = pl.spotlight < 0.3 ? 0 : pl.spotlight * 0.85
       developAll(w, this.rng, w.day)
       for (const { player: pl, by } of reviewPotential(w, this.rng, w.day)) {
         if (pl.nat[0] !== 'IRN' || pl.known < 60) continue

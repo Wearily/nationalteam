@@ -53,14 +53,17 @@ export function transferWeek(w: World, rng: Rng, day: Day): Move[] {
     if (age < 17 || p.transfers.some((t) => day - t.day < 300)) continue
     const here = club.full ? club.str : clubBase(lg.strength, club.rep)
     const k = summer ? 1 : 0.45
+    // a player who shone at a tournament is on more clubs' lists, and they pay more for him
+    const spot = p.spotlight ?? 0
+    const eye = 1 + Math.min(2.5, spot * 0.35)
     if (club.country === 'IRN') {
       // step abroad
       const surplus = p.ovr - here
-      const want = clamp(0.004 + surplus * 0.0035 + (p.pot - p.ovr) * 0.0012, 0, 0.05) * (0.45 + path * 1.3) * (0.6 + p.traits.ambition / 16) * (age <= 27 ? 1.2 : age <= 30 ? 0.7 : 0.25) * k
+      const want = clamp(0.004 + surplus * 0.0035 + (p.pot - p.ovr) * 0.0012, 0, 0.05) * (0.45 + path * 1.3) * (0.6 + p.traits.ambition / 16) * (age <= 27 ? 1.2 : age <= 30 ? 0.7 : 0.25) * k * eye
       if (p.ovr >= 62 && rng.chance(want)) {
-        const to = destination(w, rng, p, true, rng.chance(0.35 + path * 0.5) ? here + 1 : 0)
+        const to = destination(w, rng, p, true, rng.chance(0.35 + path * 0.5 + spot * 0.05) ? here + 1 : 0)
         if (to && (!europe(w, to.country) || rng.chance(0.3 + path * 0.7))) {
-          const fee = Math.round((p.value * rng.range(0.7, 1.35)) / 50_000) * 50_000
+          const fee = Math.round((p.value * rng.range(0.7, 1.35) * (1 + spot * 0.05)) / 50_000) * 50_000
           moves.push({ player: p, from: club, to, fee })
           move(w, p, to, fee, day)
           continue
@@ -79,9 +82,9 @@ export function transferWeek(w: World, rng: Rng, day: Day): Move[] {
         const to = destination(w, rng, p, false)
         if (to) { const fee = age >= 31 || stuck ? 0 : Math.round((p.value * 0.5) / 25_000) * 25_000; moves.push({ player: p, from: club, to, fee }); move(w, p, to, fee, day); continue }
       }
-      if (p.ovr > here + 3 && age <= 29 && rng.chance(0.035 * k)) {
+      if ((p.ovr > here + 3 || (spot >= 3 && p.ovr > here)) && age <= 29 && rng.chance(0.035 * k * eye)) {
         const to = destination(w, rng, p, true, here + 2)
-        if (to) { const fee = Math.round((p.value * rng.range(0.8, 1.4)) / 50_000) * 50_000; moves.push({ player: p, from: club, to, fee }); move(w, p, to, fee, day) }
+        if (to) { const fee = Math.round((p.value * rng.range(0.8, 1.4) * (1 + spot * 0.05)) / 50_000) * 50_000; moves.push({ player: p, from: club, to, fee }); move(w, p, to, fee, day) }
       }
     }
   }
