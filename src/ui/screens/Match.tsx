@@ -1,5 +1,5 @@
 import { FastForward, Pause, Play, Settings2 } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { LiveChunk } from '../../sim/game'
 import { pickXI, teamName } from '../../sim/intl/select'
 import type { Tactic } from '../../sim/match/tactics'
@@ -180,12 +180,21 @@ export function ScoreEvents({ events, names }: { events: MEvent[]; names: (id: n
     for (const e of events) if (e.team === t && e.type === 'goal' && e.q != null) (m.get(e.q) ?? m.set(e.q, []).get(e.q)!).push(`${e.min}${e.plus ? `+${e.plus}` : ''}'`)
     return [...m.entries()].map(([id, mins]) => `${names(id).split(' ').slice(-1)[0]} ${mins.join(', ')}`)
   }
-  const rows: [string, string[], string[]][] = [['⚽', side(0, ['goal', 'pen']), side(1, ['goal', 'pen'])], ['🅰️', assists(0), assists(1)], ['🟥', side(0, ['red']), side(1, ['red'])]]
-  if (rows.every((r) => !r[1].length && !r[2].length)) return null
+  // football boot, drawn rather than an emoji so it cannot be mistaken for a card
+  const boot = (
+    <svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor" aria-label="Assists" style={{ color: 'var(--text-2)', verticalAlign: -3 }}>
+      <path d="M3 5.5c0-.6.6-1 1.100-.8l4.200 1.700c.5.2.9.600 1.100 1.100l1 2.600 6.900 2.300c2 .7 3.400 2.500 3.600 4.600l.1.900c0 .600-.4 1.100-1 1.100H4.500C3.700 19 3 18.300 3 17.500v-12Z" />
+      <path d="M5 21h2m3 0h2m3 0h2m3 0h1" stroke="currentColor" strokeWidth="1.800" strokeLinecap="round" fill="none" />
+      <path d="m10.600 10.300-1.400 1.700m4-.8-1.400 1.700" stroke="#0b1020" strokeWidth="1.300" strokeLinecap="round" fill="none" />
+    </svg>
+  )
+  const card = <span aria-label="Red cards" style={{ display: 'inline-block', width: 9, height: 13, borderRadius: 2, background: '#e5484d', verticalAlign: -2 }} />
+  const rows: [string, ReactNode, string[], string[]][] = [['g', '⚽', side(0, ['goal', 'pen']), side(1, ['goal', 'pen'])], ['a', boot, assists(0), assists(1)], ['r', card, side(0, ['red']), side(1, ['red'])]]
+  if (rows.every((r) => !r[2].length && !r[3].length)) return null
   return (
     <div className="score-events">
-      {rows.filter((r) => r[1].length || r[2].length).map(([icon, h, a]) => (
-        <div key={icon} className="se-row"><div className="se-l">{h.map((x) => <div key={x}>{x}</div>)}</div><span className="se-i">{icon}</span><div className="se-r">{a.map((x) => <div key={x}>{x}</div>)}</div></div>
+      {rows.filter((r) => r[2].length || r[3].length).map(([key, icon, h, a]) => (
+        <div key={key} className="se-row"><div className="se-l">{h.map((x) => <div key={x}>{x}</div>)}</div><span className="se-i">{icon}</span><div className="se-r">{a.map((x) => <div key={x}>{x}</div>)}</div></div>
       ))}
     </div>
   )
