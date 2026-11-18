@@ -2,7 +2,7 @@
 // Input: .cache/stage/photo-wanted.json (written by 06-build). Output: public/faces/<id>.<ext>, .cache/stage/photos.json
 import { join } from 'node:path'
 import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync, statSync, unlinkSync } from 'node:fs'
+import { existsSync, mkdirSync, statSync, unlinkSync, readFileSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { ROOT, OUT, curl, commonsText, readJson, writeJson, findTemplates, plain } from './lib.ts'
 
@@ -13,7 +13,7 @@ const failed: string[] = []
 const WIDTH = 250 // Wikimedia only serves standard thumbnail steps; 250px is the closest to the requested 256
 let n = 0
 for (const [id, fileRaw] of Object.entries(wanted)) {
-  const file = fileRaw.replace(/ /g, '_')
+  const file0 = fileRaw.replace(/ /g, '_'); const file = file0[0].toUpperCase() + file0.slice(1)
   const ext = (file.match(/\.([A-Za-z0-9]+)$/)?.[1] ?? '').toLowerCase()
   if (!['jpg', 'jpeg', 'png', 'webp'].includes(ext)) { failed.push(`${id}: unsupported type ${file}`); continue }
   const outExt = ext === 'jpeg' ? 'jpg' : ext
@@ -21,13 +21,14 @@ for (const [id, fileRaw] of Object.entries(wanted)) {
   if (!(done[id]?.file === file && existsSync(dest))) {
     const md5 = createHash('md5').update(file).digest('hex')
     const enc = encodeURIComponent(file)
-    const urls = [`https://upload.wikimedia.org/wikipedia/commons/thumb/${md5[0]}/${md5.slice(0, 2)}/${enc}/${WIDTH}px-${enc}`, `https://commons.wikimedia.org/wiki/Special:FilePath/${enc}?width=${WIDTH}`]
+    // Special:FilePath redirects to thumb.wikimedia.org (unreachable here), so only the direct upload thumbnail URL is used
+    const urls = [`https://upload.wikimedia.org/wikipedia/commons/thumb/${md5[0]}/${md5.slice(0, 2)}/${enc}/${WIDTH}px-${enc}`, `https://upload.wikimedia.org/wikipedia/en/thumb/${md5[0]}/${md5.slice(0, 2)}/${enc}/${WIDTH}px-${enc}`]
     let ok = false
     for (const u of urls) {
-      for (let a = 0; a < 3 && !ok; a++) {
-        spawnSync('sleep', ['0.7'])
+      for (let a = 0; a < 4 && !ok; a++) {
+        spawnSync('sleep', ['1.3'])
         const r = curl(u, { out: dest })
-        if (r.status === 200 && existsSync(dest) && statSync(dest).size > 1500) ok = true
+        if (r.status === 200 && existsSync(dest) && statSync(dest).size > 1500 && [0xff, 0x89, 0x52].includes(readFileSync(dest)[0])) ok = true
         else if (r.status === 429) spawnSync('sleep', [String(10 * (a + 1))]); else break
       }
       if (ok) break

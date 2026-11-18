@@ -5,7 +5,7 @@ import type { RawData } from '../sim/data/raw'
 import type { World } from '../sim/world/state'
 
 let game: Game | null = null
-const CMDS = new Set(['announceSquad', 'assignScout', 'hireCoach', 'approach', 'setControl', 'setTactic', 'setBudget', 'markRead', 'suggestSquad'])
+const CMDS = new Set(['announceSquad', 'assignScout', 'hireCoach', 'approach', 'setControl', 'setTactic', 'setBudget', 'markRead', 'suggestSquad', 'arrangeFriendly'])
 
 const api = {
   newGame(raw: RawData, seed: number, name: string): World {

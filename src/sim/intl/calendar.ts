@@ -133,3 +133,107 @@ export function rebuildCamps(w: World) {
     }
   }
 }
+
+const pick = (w: World, confed: string, n: number, rng: Rng, exclude: Set<string>) =>
+  Object.values(w.nations).filter((x) => x.confed === confed && !exclude.has(x.code)).map((x) => ({ c: x.code, v: x.points + rng.normal(0, 45) })).sort((a, b) => b.v - a.v).slice(0, n).map((x) => x.c)
+
+/**
+ * AFC qualifying for a World Cup, following the 2026 structure (the 2030 format is not published):
+ * round 2 — nine groups of four, top two advance; round 3 — three groups of six, top two qualify,
+ * third and fourth go to round 4 — two groups of three, winners qualify. Eight AFC places.
+ */
+export function setupWCQ(w: World, rng: Rng, wcYear: number): Comp {
+  const afc = Object.values(w.nations).filter((n) => n.confed === 'AFC').sort((a, b) => b.points - a.points).slice(0, 36).map((n) => n.code)
+  if (!afc.includes('IRN')) afc[35] = 'IRN'
+  afc.sort((a, b) => w.nations[b].points - w.nations[a].points)
+  const groups: string[][] = Array.from({ length: 9 }, () => [])
+  for (let pot = 0; pot < 4; pot++) rng.shuffle(afc.slice(pot * 9, pot * 9 + 9)).forEach((t, i) => groups[i].push(natRef(t)))
+  const w1 = windows(wcYear - 2)
+  const w2 = windows(wcYear - 1)
+  const mar = windows(wcYear)[0].start
+  const comp: Comp = {
+    id: w.comps.length, key: `wcq-afc:${wcYear}`, name: `World Cup ${wcYear} qualifying (AFC)`, short: 'WC qualifier', scope: 'nat', level: 'senior', season: wcYear, weight: 25,
+    stages: [
+      { type: 'groups', name: 'Second round', groups, legs: 2, days: [...w1[0].days, ...w1[1].days, ...w1[2].days.slice(0, 2)], neutral: false, tiebreak: 'gd', advance: 2, bestNext: 0, fixturesMade: false },
+      { type: 'groups', name: 'Third round', groups: [[], [], []], legs: 2, days: [...w2[0].days, ...w2[1].days, ...w2[2].days, ...w2[3].days], neutral: false, tiebreak: 'gd', direct: 2, advance: 2, bestNext: 0, fixturesMade: false },
+      { type: 'groups', name: 'Fourth round', groups: [[], []], legs: 1, days: [mar, mar + 3, mar + 6], neutral: true, tiebreak: 'gd', direct: 1, advance: 0, bestNext: 0, fixturesMade: false },
+    ],
+    cur: 0, done: false, squadSize: 26, subs: 5, assumed: true,
+  }
+  w.comps.push(comp)
+  makeGroupFixtures(w, comp, 0)
+  return comp
+}
+
+/**
+ * FIFA World Cup, 48 teams: twelve groups of four, top two and the eight best third-placed teams
+ * reach the round of 32. AFC entrants come from the simulated qualifiers; other confederations
+ * are filled by ranking (their qualifiers are not simulated). Draw pots are by ranking.
+ */
+export function setupWorldCup(w: World, rng: Rng, year: number, hosts: string[]): Comp {
+  const q = w.comps.find((c) => c.key === `wcq-afc:${year}`)
+  const afc = q?.placings ? Object.entries(q.placings).filter(([, v]) => v === 'Qualified').map(([k]) => k.split(':')[1]) : []
+  const ex = new Set<string>([...hosts.filter((h) => w.nations[h]), ...afc])
+  const field = [...ex]
+  const quota: [string, number][] = [['UEFA', 16], ['CAF', 10], ['CONMEBOL', 6], ['CONCACAF', 6], ['OFC', 1], ['AFC', 8]]
+  for (const [conf, n] of quota) {
+    const have = field.filter((c) => w.nations[c].confed === conf).length
+    for (const c of pick(w, conf, Math.max(0, n - have), rng, ex)) { field.push(c); ex.add(c) }
+  }
+  const rest = Object.values(w.nations).filter((n) => !ex.has(n.code)).sort((a, b) => b.points - a.points)
+  while (field.length < 48 && rest.length) field.push(rest.shift()!.code)
+  const hs = new Set(hosts)
+  const ranked = field.slice(0, 48).sort((a, b) => Number(hs.has(b)) - Number(hs.has(a)) || w.nations[b].points - w.nations[a].points)
+  const groups: string[][] = Array.from({ length: 12 }, () => [])
+  for (let pot = 0; pot < 4; pot++) rng.shuffle(ranked.slice(pot * 12, pot * 12 + 12)).forEach((t, i) => groups[i].push(natRef(t)))
+  const d0 = toDay(year, 6, 13)
+  const ko = (name: string, days: number[], third?: number) => ({ type: 'ko' as const, name, legs: 1 as const, days: days.map((d) => d0 + d), neutral: true, teams: [], fixturesMade: false, thirdPlace: third != null ? d0 + third : undefined })
+  const comp: Comp = {
+    id: w.comps.length, key: `world-cup:${year}`, name: `FIFA World Cup ${year}`, short: 'World Cup', scope: 'nat', level: 'senior', season: year, weight: 50, bracket: 'std', host: hosts[0],
+    stages: [
+      { type: 'groups', name: 'Group stage', groups, legs: 1, days: [d0, d0 + 6, d0 + 12], offsets: [0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5], neutral: true, tiebreak: 'h2h', advance: 2, bestNext: 8, fixturesMade: false },
+      ko('Round of 32', [18, 19, 20, 21, 22, 23]), ko('Round of 16', [25, 26, 27, 28]), ko('Quarter-finals', [31, 32]), ko('Semi-finals', [35, 36]), ko('Final', [40], 39),
+    ],
+    cur: 0, done: false, squadSize: 26, subs: 5, assumed: true,
+  }
+  w.comps.push(comp)
+  makeGroupFixtures(w, comp, 0)
+  return comp
+}
+
+/** AFC youth championship: sixteen teams, four groups, quarter-finals onward. Entrants are assumed from rankings. */
+export function setupYouthCup(w: World, rng: Rng, level: Level, year: number, d0: Day): Comp {
+  const afc = Object.values(w.nations).filter((n) => n.confed === 'AFC' && n.code !== 'IRN').map((n) => ({ c: n.code, v: n.points + rng.normal(0, 60) })).sort((a, b) => b.v - a.v).slice(0, 15).map((x) => x.c)
+  const ranked = ['IRN', ...afc].sort((a, b) => w.nations[b].points - w.nations[a].points)
+  const groups: string[][] = [[], [], [], []]
+  for (let pot = 0; pot < 4; pot++) rng.shuffle(ranked.slice(pot * 4, pot * 4 + 4)).forEach((t, i) => groups[i].push(natRef(t, level)))
+  const comp: Comp = {
+    id: w.comps.length, key: `afc-${level}:${year}`, name: `AFC ${LEVEL_NAME[level]} Asian Cup ${year}`, short: `${LEVEL_NAME[level]} Asian Cup`, scope: 'nat', level, season: year, weight: 0,
+    stages: [
+      { type: 'groups', name: 'Group stage', groups, legs: 1, days: [d0, d0 + 3, d0 + 6], offsets: [0, 0, 1, 1], neutral: true, tiebreak: 'h2h', advance: 2, bestNext: 0, fixturesMade: false },
+      { type: 'ko', name: 'Quarter-finals', legs: 1, days: [d0 + 10, d0 + 11], neutral: true, teams: [], fixturesMade: false },
+      { type: 'ko', name: 'Semi-finals', legs: 1, days: [d0 + 14], neutral: true, teams: [], fixturesMade: false },
+      { type: 'ko', name: 'Final', legs: 1, days: [d0 + 17], neutral: true, teams: [], fixturesMade: false },
+    ],
+    cur: 0, done: false, squadSize: 23, subs: 5, assumed: true,
+  }
+  w.comps.push(comp)
+  makeGroupFixtures(w, comp, 0)
+  return comp
+}
+
+/** Everything that should be created for the coming calendar year (called each 1 December and at the start). */
+export function planYear(w: World, rng: Rng, year: number, from: Day) {
+  const has = (key: string) => w.comps.some((c) => c.key === key)
+  if (year >= 2032 && (year - 2032) % 4 === 0 && !has(`afc-asian-cup:${year}`)) {
+    const hosts = Object.values(w.nations).filter((n) => n.confed === 'AFC' && n.code !== 'IRN').sort((a, b) => b.points - a.points).slice(0, 12)
+    setupAsianCup(w, rng, year, toDay(year, 1, 8), rng.pick(hosts).code)
+  }
+  // World Cup qualifying starts two years before each World Cup (2030, 2034, …)
+  if ((year + 2 - 2030) % 4 === 0 && year + 2 >= 2030 && !has(`wcq-afc:${year + 2}`)) setupWCQ(w, rng, year + 2)
+  if (year % 2 === 0 && !has(`afc-u23:${year}`) && toDay(year, 4, 14) > from) setupYouthCup(w, rng, 'u23', year, toDay(year, 4, 14))
+  if (year % 2 === 1 && !has(`afc-u20:${year}`) && toDay(year, 2, 12) > from) setupYouthCup(w, rng, 'u20', year, toDay(year, 2, 12))
+  if (!has(`afc-u17:${year}`) && toDay(year, 5, 5) > from) setupYouthCup(w, rng, 'u17', year, toDay(year, 5, 5))
+  scheduleYear(w, rng, year, from)
+  rebuildCamps(w)
+}

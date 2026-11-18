@@ -5,8 +5,8 @@ import { developAll, revalue, seasonRollover } from './career/develop'
 import { seasonYearFor, simClubFixture, startLeagueSeason } from './clubs/season'
 import { transferWeek } from './clubs/transfers'
 import { progress } from './comps/engine'
-import type { Comp, KoStage } from './comps/types'
-import { ASIAN_CUP_2027, rebuildCamps, scheduleYear, setupAsianCup } from './intl/calendar'
+import type { Comp, GroupStage, KoStage } from './comps/types'
+import { ASIAN_CUP_2027, planYear, rebuildCamps, setupAsianCup, setupWorldCup } from './intl/calendar'
 import { applyRanking, rerank } from './intl/ranking'
 import { aiTactic, buildMTeam, eligible, pickSquad, selectionScore, teamName } from './intl/select'
 import { MatchSim } from './match/engine'
@@ -54,8 +54,7 @@ export class Game {
     for (const p of w.players) { p.injury = p.injury && p.injury.until > w.day ? p.injury : null; p.cond = 92 }
     for (const c of w.comps) progress(w, c, this.rng)
     const ac = setupAsianCup(w, this.rng, 2027, toDay(2027, 12, 23), 'KSA', ASIAN_CUP_2027)
-    scheduleYear(w, this.rng, 2027, w.day)
-    rebuildCamps(w)
+    planYear(w, this.rng, 2027, w.day)
     rerank(w)
     w.rankHist.push([w.day, w.nations.IRN.rank])
     this.idx = buildIndex(w)
@@ -233,6 +232,31 @@ export class Game {
     p.iranStatus = roll - will < 20 ? 'interested' : 'reluctant'
     return roll - will < 20 ? `${p.name} is flattered and wants to think it over. A camp invitation later may persuade him.` : `${p.name} says his focus is elsewhere for now.`
   }
+  friendlyCost(opp: string): number {
+    const n = this.w.nations[opp]
+    return n ? Math.max(0, Math.round(((n.level - 62) * 45_000) / 10_000) * 10_000) : 0
+  }
+  /** Swap the opponent of an upcoming friendly. Stronger nations charge a fee and may decline. */
+  arrangeFriendly(fixtureId: number, opp: string): string {
+    const w = this.w
+    const f = w.fixtures.find((x) => x.id === fixtureId)
+    const n = w.nations[opp]
+    if (!f || f.played || !n || !w.comps[f.compId].friendly) return 'That fixture cannot be changed.'
+    if (f.day - w.day < 10) return 'Too late: opponents need at least ten days\' notice.'
+    const iranHome = f.home.startsWith('n:IRN:')
+    const level = (iranHome ? f.home : f.away).split(':')[2] as Level
+    if (opp === 'IRN') return 'Choose another nation.'
+    if (w.fixtures.some((x) => x !== f && !x.played && Math.abs(x.day - f.day) <= 5 && (x.home === natRef(opp, level) || x.away === natRef(opp, level)))) return `${n.name} already have a match in that window.`
+    const cost = level === 'senior' ? this.friendlyCost(opp) : Math.round(this.friendlyCost(opp) * 0.15)
+    if (w.fed.budget < cost) return `The federation cannot afford the ${n.name} match fee.`
+    // big nations are choosy about opponents ranked well below them
+    const gap = n.level - w.nations.IRN.level
+    if (gap > 5 && this.rng.chance(Math.min(0.85, (gap - 5) * 0.09))) return `${n.name} declined: they have other plans for that date.`
+    if (iranHome) f.away = natRef(opp, level); else f.home = natRef(opp, level)
+    if (cost) { w.fed.budget -= cost; w.fed.ledger.push({ day: w.day, label: `Friendly against ${n.name}`, amount: -cost }) }
+    this.idx = buildIndex(w)
+    return `Friendly against ${n.name} confirmed${cost ? ` for a fee of €${(cost / 1000).toFixed(0)}K` : ''}.`
+  }
   setControl(level: Level, control: 'manual' | 'auto') { this.w.teams[level].control = control }
   setTactic(level: Level, tac: Tactic) { this.w.teams[level].tactic = tac }
   setBudget(key: 'scoutBudget' | 'youthInvest', v: number) { this.w.fed[key] = clamp(Math.round(v), 0, 5_000_000) }
@@ -311,7 +335,7 @@ export class Game {
       p.injury = { name: days > 100 ? 'Knee ligament injury' : days > 30 ? 'Hamstring tear' : days > 12 ? 'Muscle strain' : 'Knock', until: f.day + days }
       if (p.nat[0] === 'IRN') this.msg('injury', `${p.name} injured`, `${p.name} suffered a ${p.injury.name.toLowerCase()} against ${teamName(w, t === 0 ? f.away : f.home).name} and is out until about ${fmtDay(p.injury.until)}.`, false, `player:${p.id}`)
     }
-    if (level === 'senior') applyRanking(w, f, comp.weight + (ko && comp.weight >= 35 && comp.stages.length - f.stage <= 3 ? 5 : 0), ko)
+    if (level === 'senior') applyRanking(w, f, comp.weight + (ko && comp.weight >= 35 && comp.stages.length - f.stage <= 3 ? (comp.weight >= 50 ? 10 : 5) : 0), ko)
     const iranSide = f.home.startsWith('n:IRN:') ? 0 : f.away.startsWith('n:IRN:') ? 1 : -1
     if (iranSide >= 0) {
       const names: Record<number, string> = {}
@@ -359,12 +383,13 @@ export class Game {
         if (comp.done) this.closeComp(comp)
         else if (comp.cur !== before) {
           const st = comp.stages[comp.cur] as KoStage
-          const inIt = st.teams.includes(iran)
+          const inIt = st.type === 'ko' ? st.teams.includes(iran) : (st as unknown as GroupStage).groups.some((g) => g.includes(iran))
+          if (comp.placings?.[iran] === 'Qualified' && !w.history.some((h) => h.comp === comp.name)) { this.msg('news', 'Iran qualify for the World Cup', 'Qualification is secured with matches to spare.', true, `comp:${comp.id}`); w.history.push({ year: comp.season, comp: comp.name, level: comp.level, result: 'Qualified' }); w.fed.board = clamp(w.fed.board + 12, 0, 100); w.fed.fans = clamp(w.fed.fans + 10, 0, 100) }
           const was = [...w.fixtures].some((x) => x.compId === comp.id && x.stage === before && (x.home === iran || x.away === iran))
-          if (was && !inIt) this.eliminated(comp, comp.stages[before].name)
+          if (was && !inIt && comp.placings?.[iran] !== 'Qualified') this.eliminated(comp, comp.stages[before].name)
           else if (inIt) {
             const fx = w.fixtures.find((x) => x.compId === comp.id && x.stage === comp.cur && (x.home === iran || x.away === iran) && x.slot !== 99)
-            if (fx) this.msg('match', `${comp.short}: ${st.name} draw`, `Iran will face ${teamName(w, fx.home === iran ? fx.away : fx.home).name} in the ${st.name.toLowerCase()} on ${fmtDay(fx.day)}.`, true, `comp:${comp.id}`)
+            if (fx) this.msg('match', `${comp.short}: ${st.name}`, `Iran will face ${teamName(w, fx.home === iran ? fx.away : fx.home).name} in the ${st.name.toLowerCase()} on ${fmtDay(fx.day)}.`, true, `comp:${comp.id}`)
           }
         }
       } else if (comp.done) this.leagueDone(comp)
@@ -521,13 +546,14 @@ export class Game {
         for (const n of seasonRollover(w, this.rng, w.day)) this.msg('news', n.split(' has ')[0].split(' (')[0], n)
         this.idx = buildIndex(w)
       }
-      if (m === 12) {
-        // Asian Cups after 2027 are played in even years (2032, 2036, …)
-        if (y + 1 >= 2032 && (y + 1 - 2032) % 4 === 0) {
-          const hosts = Object.values(w.nations).filter((n) => n.confed === 'AFC' && n.code !== 'IRN').sort((a, b) => b.points - a.points).slice(0, 12)
-          setupAsianCup(w, this.rng, y + 1, toDay(y + 1, 1, 8), this.rng.pick(hosts).code)
-        }
-        scheduleYear(w, this.rng, y + 1, w.day); rebuildCamps(w); this.idx = buildIndex(w)
+      if (m === 12) { planYear(w, this.rng, y + 1, w.day); this.idx = buildIndex(w) }
+      if (m === 4 && y >= 2030 && (y - 2030) % 4 === 0 && !w.comps.some((c) => c.key === `world-cup:${y}`)) {
+        const hosts = y === 2030 ? ['ESP', 'POR', 'MAR'] : [Object.values(w.nations).sort((a, b) => b.points - a.points)[this.rng.int(0, 15)].code]
+        const wc = setupWorldCup(w, this.rng, y, hosts)
+        const in_ = (wc.stages[0] as GroupStage).groups.some((g) => g.includes(natRef('IRN')))
+        this.msg('news', `World Cup ${y}: the draw`, in_ ? 'Iran have qualified and know their group. The squad deadline is in early June.' : 'Iran did not qualify. The tournament goes ahead without Team Melli.', true, `comp:${wc.id}`)
+        if (!in_) { w.fed.board = clamp(w.fed.board - 18, 0, 100); w.fed.fans = clamp(w.fed.fans - 18, 0, 100) }
+        rebuildCamps(w); this.idx = buildIndex(w)
       }
       // staff contracts
       for (const t of Object.values(w.teams)) {
@@ -550,7 +576,7 @@ export class Game {
     let wages = 0
     for (const t of Object.values(w.teams)) if (t.coachId != null) wages += w.staff[t.coachId].wage / 12
     for (const j of w.scouts) wages += (w.staff[j.staffId]?.wage ?? 0) / 12
-    const costs = Math.round(wages + f.scoutBudget / 12 + f.youthInvest / 12 + 420_000)
+    const costs = Math.round(wages + f.scoutBudget / 12 + f.youthInvest / 12 + 640_000)
     f.income = income - costs
     f.budget += f.income
     f.ledger.push({ day: w.day, label: 'Monthly income', amount: income }, { day: w.day, label: 'Wages, scouting and youth programmes', amount: -costs })

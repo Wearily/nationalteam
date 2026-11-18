@@ -150,7 +150,31 @@ export function progress(w: World, comp: Comp, rng: Rng): boolean {
   const next = comp.stages[si + 1] as KoStage | undefined
   if (st.type === 'groups') {
     const tabs = groupTables(w, comp, si)
+    const direct = st.direct ?? 0
+    if (direct) {
+      comp.placings ??= {}
+      for (const t of tabs) t.slice(0, direct).forEach((r) => (comp.placings![r.team] = 'Qualified'))
+    }
+    const nextAny = comp.stages[si + 1]
+    if (nextAny && nextAny.type === 'groups') {
+      // groups → groups: seed the qualifiers into pots by ranking and draw
+      const q: TeamRef[] = []
+      for (const t of tabs) t.slice(direct, direct + st.advance).forEach((r) => q.push(r.team))
+      const extra = tabs.map((t) => t[direct + st.advance]).filter(Boolean).sort((x, y) => y.pts - x.pts || y.gf - y.ga - (x.gf - x.ga) || y.gf - x.gf).slice(0, st.bestNext)
+      for (const r of extra) q.push(r.team)
+      comp.placings ??= {}
+      for (const t of tabs) for (const r of t) if (!q.includes(r.team) && !comp.placings[r.team]) comp.placings[r.team] = st.name
+      const pts = (ref: TeamRef) => w.nations[ref.split(':')[1]]?.points ?? 0
+      q.sort((x, y) => pts(y) - pts(x))
+      const G = nextAny.groups.length
+      nextAny.groups = Array.from({ length: G }, () => [])
+      for (let pot = 0; pot * G < q.length; pot++) rng.shuffle(q.slice(pot * G, pot * G + G)).forEach((t, i) => nextAny.groups[i].push(t))
+      comp.cur = si + 1
+      makeGroupFixtures(w, comp, si + 1)
+      return true
+    }
     if (!next) {
+      if (direct) { comp.done = true; for (const t of tabs) for (const r of t) comp.placings![r.team] ??= st.name; return true }
       comp.done = true
       comp.winner = tabs[0][0].team
       comp.placings = {}

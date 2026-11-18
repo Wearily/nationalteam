@@ -106,12 +106,14 @@ export function Comps({ id }: { id?: number }) {
 }
 
 export function Calendar() {
-  const { w } = useGame()
+  const { w, cmd, notify } = useGame()
   const world = w!
   const [level, setLevel] = useState<'all' | 'senior'>('senior')
   const fx = useMemo(() => world.fixtures.filter((f) => (level === 'all' ? f.home.startsWith('n:IRN:') || f.away.startsWith('n:IRN:') : f.home === 'n:IRN:senior' || f.away === 'n:IRN:senior') && f.day >= world.day - 120).sort((a, b) => a.day - b.day), [world, level])
   const months = new Map<string, Fixture[]>()
   for (const f of fx) { const { y, m } = ymd(f.day); const k = `${monthName(m)} ${y}`; (months.get(k) ?? months.set(k, []).get(k)!).push(f) }
+  const friendlies = fx.filter((f) => !f.played && world.comps[f.compId].friendly && f.day - world.day >= 10).slice(0, 8)
+  const nations = useMemo(() => Object.values(world.nations).filter((n) => n.code !== 'IRN').sort((a, b) => a.rank - b.rank), [world])
   const camps = world.camps.filter((c) => !c.done && (level === 'all' || c.level === 'senior')).sort((a, b) => a.from - b.from).slice(0, 6)
   return (
     <div className="page-inner">
@@ -125,8 +127,17 @@ export function Calendar() {
           ))}
           {!fx.length && <div className="card"><Empty>No fixtures scheduled.</Empty></div>}
         </div>
+        <div className="col" style={{ gap: 18 }}>
+        <div className="card col"><h3>Arrange friendlies</h3>
+          <span className="faint" style={{ fontSize: 12 }}>Friendlies are booked automatically in free international windows. Pick a different opponent here: stronger nations sharpen the squad and move the ranking more, but charge a match fee and may say no.</span>
+          {friendlies.length ? friendlies.map((f) => { const opp = (f.home.startsWith('n:IRN:') ? f.away : f.home).split(':')[1]; return (
+            <div key={f.id} className="row" style={{ padding: '4px 0' }}><span className="faint num" style={{ width: 58, fontSize: 12 }}>{fmtDay(f.day, false)}</span><span className="pill">{LEVEL_NAME[f.home.split(':')[2] as 'u23']}</span>
+              <select className="input grow" value={opp} onChange={(e) => void cmd<string>('arrangeFriendly', f.id, e.target.value).then(notify)}>{nations.map((n) => <option key={n.code} value={n.code}>#{n.rank} {n.name}</option>)}</select></div>
+          ) }) : <span className="faint">No friendlies far enough ahead to change.</span>}
+        </div>
         <div className="card col"><h3>Squad deadlines</h3>
           {camps.length ? camps.map((c) => <div key={c.id} className="row" style={{ padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.045)' }}><div className="grow"><b>{c.label}</b><div className="faint" style={{ fontSize: 12 }}>{LEVEL_NAME[c.level]} · up to {c.size} players · first match {fmtDay(c.first, false)}</div></div><span className={`pill ${c.announced ? 'green' : c.from <= world.day ? 'red' : ''}`}>{c.announced ? 'Named' : fmtDay(c.from, false)}</span></div>) : <span className="faint">Nothing due.</span>}
+        </div>
         </div>
       </div>
     </div>

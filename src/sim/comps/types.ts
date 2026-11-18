@@ -16,6 +16,8 @@ export interface GroupStage {
   advance: number
   /** Extra best-ranked teams finishing in position advance+1. */
   bestNext: number
+  /** Top N per group qualify outright (recorded as 'Qualified') and take no further part. */
+  direct?: number
   /** Per-group day offset added to every matchday. */
   offsets?: number[]
   fixturesMade: boolean
