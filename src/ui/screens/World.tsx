@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react'
 import { fmtDay } from '../../sim/core/date'
 import { table } from '../../sim/comps/engine'
 import type { GroupStage } from '../../sim/comps/types'
-import { ageOf, clubOf, Crest, Empty, Flag, leagueOf, money, Ovr, PlayerLink, PosTag, Rating } from '../bits'
+import { ClubBadge, clubLogo, ageOf, clubOf, Crest, Empty, Flag, leagueOf, money, Ovr, PlayerLink, PosTag, Rating } from '../bits'
 import { useGame } from '../store'
 
 export function Rankings() {
@@ -46,7 +46,7 @@ export function WorldLeagues({ league }: { league?: number }) {
       <div className="grid" style={{ gridTemplateColumns: 'minmax(0,1.25fr) minmax(0,1fr)', alignItems: 'start' }}>
         <div className="card flush"><div className="card-head"><h3>{lg.name}{comp ? ` ${comp.season}/${String((comp.season + 1) % 100).padStart(2, '0')}` : ''}</h3></div>
           {rows.length ? <table className="t"><thead><tr><th style={{ width: 34 }}>#</th><th>Club</th><th className="c">P</th><th className="c">W</th><th className="c">D</th><th className="c">L</th><th className="c">GD</th><th className="c">Pts</th></tr></thead><tbody>
-            {rows.map((r, i) => { const c = world.clubs[+r.team.split(':')[1]]; return <tr key={r.team} className={`click ${clubId === c.id ? 'sel' : ''}`} onClick={() => setClubId(c.id)}><td className="faint num">{i + 1}</td><td><span className="row" style={{ gap: 9 }}><Crest colors={c.colors} logo={c.logo} />{c.name}</span></td><td className="c num">{r.p}</td><td className="c num">{r.w}</td><td className="c num">{r.d}</td><td className="c num">{r.l}</td><td className="c num">{r.gf - r.ga > 0 ? '+' : ''}{r.gf - r.ga}</td><td className="c num"><b>{r.pts}</b></td></tr> })}
+            {rows.map((r, i) => { const c = world.clubs[+r.team.split(':')[1]]; return <tr key={r.team} className={`click ${clubId === c.id ? 'sel' : ''}`} onClick={() => setClubId(c.id)}><td className="faint num">{i + 1}</td><td><span className="row" style={{ gap: 9 }}><Crest colors={c.colors} logo={clubLogo(c)} />{c.name}</span></td><td className="c num">{r.p}</td><td className="c num">{r.w}</td><td className="c num">{r.d}</td><td className="c num">{r.l}</td><td className="c num">{r.gf - r.ga > 0 ? '+' : ''}{r.gf - r.ga}</td><td className="c num"><b>{r.pts}</b></td></tr> })}
           </tbody></table> : <Empty>The season has not started.</Empty>}
         </div>
         <div className="card flush"><div className="card-head"><h3>{clubId != null ? world.clubs[clubId].name : `Iranians in the ${lg.name}`}</h3>{clubId != null && <button className="btn sm ghost right" onClick={() => setClubId(null)}>Show Iranians</button>}</div>
@@ -76,7 +76,7 @@ export function Transfers() {
       <div className="grid g2" style={{ alignItems: 'start' }}>
         <div className="card flush"><div className="card-head"><h3>Recent moves</h3><span className="faint">Iranian players · windows open in January and July–August</span></div>
           {moves.length ? <table className="t"><thead><tr><th>Date</th><th>Player</th><th>From</th><th>To</th><th className="r">Fee</th></tr></thead><tbody>
-            {moves.map(({ p, t }, i) => <tr key={i} className="click" onClick={() => link(`player:${p.id}`)}><td className="faint num">{fmtDay(t.day)}</td><td><b>{p.name}</b></td><td className="muted">{t.from != null ? world.clubs[t.from].name : 'Free agent'}</td><td><span className="row" style={{ gap: 7 }}>{t.to != null && <Flag code={world.clubs[t.to].country} />}{t.to != null ? world.clubs[t.to].name : '–'}</span></td><td className="r num">{t.fee ? money(t.fee) : 'Free'}</td></tr>)}
+            {moves.map(({ p, t }, i) => <tr key={i} className="click" onClick={() => link(`player:${p.id}`)}><td className="faint num">{fmtDay(t.day)}</td><td><b>{p.name}</b></td><td className="muted"><span className="row" style={{ gap: 7 }}>{t.from != null && <ClubBadge clubId={t.from} />}{t.from != null ? world.clubs[t.from].name : 'Free agent'}</span></td><td><span className="row" style={{ gap: 7 }}>{t.to != null && <ClubBadge clubId={t.to} />}{t.to != null ? world.clubs[t.to].name : '–'}{t.to != null && <Flag code={world.clubs[t.to].country} sm />}</span></td><td className="r num">{t.fee ? money(t.fee) : 'Free'}</td></tr>)}
           </tbody></table> : <Empty>No transfers yet. The next window opens in January.</Empty>}
         </div>
         <div className="col" style={{ gap: 18 }}>

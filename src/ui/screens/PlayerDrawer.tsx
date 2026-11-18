@@ -4,7 +4,7 @@ import { fmtDay, ymd } from '../../sim/core/date'
 import { A, type Attr, ATTR_LABEL, effectiveOverall, faceStats, POS_LIST, POS_NAME } from '../../sim/ratings/attributes'
 import { dynOvr, engineDelta } from '../../sim/ratings/dynamic'
 import { LEVEL_NAME, type Level, type Player, type SeasonStats } from '../../sim/world/types'
-import { ageOf, clubOf, Crest, Face, Flag, leagueOf, Meter, money, ovrColor, PosTag, Rating, ratingColor, scoutView } from '../bits'
+import { clubLogo, ageOf, clubOf, Crest, Face, Flag, leagueOf, Meter, money, ovrColor, PosTag, Rating, ratingColor, scoutView } from '../bits'
 import { useGame } from '../store'
 
 const CATS: { name: string; attrs: Attr[] }[] = [
@@ -104,7 +104,7 @@ export function PlayerProfile({ id }: { id: number }) {
             <div className="kv"><span>Condition</span><b style={{ color: p.injury ? '#ffb3b8' : undefined }}>{condLabel}</b></div>
           </div>
           <div className="infogrid">
-            <div className="kv"><span>Club</span><b>{c ? <><Crest colors={c.colors} logo={c.logo} /><span className="truncate">{c.name}</span></> : 'Free agent'}</b></div>
+            <div className="kv"><span>Club</span><b>{c ? <><Crest colors={c.colors} logo={clubLogo(c)} /><span className="truncate">{c.name}</span></> : 'Free agent'}</b></div>
             <div className="kv"><span>Market value</span><b className="num">{money(p.value)}</b></div>
             <div className="kv"><span>Scouting knowledge</span><b className="num">{Math.round(p.known)}%</b></div>
             <div className="facecol">{fs.labels.map((l, i) => <div key={l}><span>{({ PAC: 'Pace', SHO: 'Shooting', PAS: 'Passing', DRI: 'Dribbling', DEF: 'Defending', PHY: 'Physical', DIV: 'Diving', HAN: 'Handling', KIC: 'Kicking', REF: 'Reflexes', SPD: 'Speed', POS: 'Positioning' } as Record<string, string>)[l]}</span><b>{v.attrs ? fs.values[i] : '?'}</b></div>)}</div>

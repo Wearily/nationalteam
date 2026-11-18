@@ -4,13 +4,13 @@ import { groupTables, stageFixtures } from '../../sim/comps/engine'
 import type { Comp, GroupStage, KoStage, Row } from '../../sim/comps/types'
 import { teamName } from '../../sim/intl/select'
 import { LEVEL_NAME, type Fixture, type TeamRef } from '../../sim/world/types'
-import { Crest, Empty, Flag } from '../bits'
+import { clubLogo, Crest, Empty, Flag } from '../bits'
 import { useGame } from '../store'
 
 export function TeamCell({ team, bold }: { team: TeamRef; bold?: boolean }) {
   const w = useGame((s) => s.w)!
   const n = teamName(w, team)
-  return <span className="row" style={{ gap: 8, fontWeight: bold ? 680 : 480 }}>{team.startsWith('n:') ? <Flag code={team.split(':')[1]} /> : <Crest colors={n.colors} logo={w.clubs[+team.split(':')[1]]?.logo} />}<span className="truncate">{n.name}</span></span>
+  return <span className="row" style={{ gap: 8, fontWeight: bold ? 680 : 480 }}>{team.startsWith('n:') ? <Flag code={team.split(':')[1]} /> : <Crest colors={n.colors} logo={clubLogo(w.clubs[+team.split(':')[1]])} />}<span className="truncate">{n.name}</span></span>
 }
 export function Table({ rows, hl, adv = 0, next = 0 }: { rows: Row[]; hl?: (t: TeamRef) => boolean; adv?: number; next?: number }) {
   return (

@@ -5,6 +5,7 @@ import { faceStats, posLine } from '../sim/ratings/attributes'
 import { dynOvr } from '../sim/ratings/dynamic'
 import type { World } from '../sim/world/state'
 import type { Player, Pos } from '../sim/world/types'
+import LOGOS from '../../data/overrides/logos.json'
 import { FIFA_ISO } from './flags'
 import { useGame } from './store'
 
@@ -41,13 +42,15 @@ export function Flag({ code, lg, sm }: { code: string; lg?: boolean; sm?: boolea
   const [a, b] = n?.colors ?? ['#555', '#888']
   return <span className={`flag${lg ? ' lg' : ''}`} style={{ background: `linear-gradient(135deg, ${a} 0 55%, ${b} 55%)` }} title={n?.name ?? code}>{code}</span>
 }
+/** Logo path for a club: the dataset's own, else the ESPN-sourced override keyed by club id. */
+export const clubLogo = (c: { logo?: string; rid: string } | null | undefined): string | undefined => (c ? c.logo ?? (LOGOS as Record<string, string>)[c.rid] : undefined)
 export function Crest({ colors, lg, logo }: { colors: [string, string]; lg?: boolean; logo?: string }) {
   if (logo) return <img className={`crest-img${lg ? ' lg' : ''}`} src={`${import.meta.env.BASE_URL}${logo}`} alt="" loading="lazy" />
   return <span className={`crest${lg ? ' lg' : ''}`} style={{ background: `linear-gradient(135deg, ${colors[0]} 0 50%, ${colors[1]} 50%)` }} />
 }
 export function ClubBadge({ clubId, lg }: { clubId: number; lg?: boolean }) {
   const c = useGame((s) => s.w?.clubs[clubId])
-  return c ? <Crest colors={c.colors} logo={c.logo} lg={lg} /> : null
+  return c ? <Crest colors={c.colors} logo={clubLogo(c)} lg={lg} /> : null
 }
 export function PosTag({ pos }: { pos: Pos }) {
   return <span className={`pos ${posLine(pos)}`}>{pos}</span>
