@@ -493,3 +493,6 @@ h1 { font-size: 36px; font-weight: 720; } h2 { font-size: 22px; } h3 { font-size
 .lp-subs .eyebrow { grid-column: 1 / -1; }
 .lp-sub { position: relative; display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 10px; background: rgba(255,255,255,0.045); font-size: 12.5px; text-align: left; min-width: 0; }
 .lp-sub .lp-av { width: 28px; height: 28px; } .lp-sub .lp-rt { position: static; margin-left: auto; }
+
+/* longer, softer dissolve on the right edge of full-height profile photos */
+.profile-face.full .photo, .profile-face.full::after { -webkit-mask-image: linear-gradient(to right, #000 0, #000 70%, rgba(0,0,0,0.75) 82%, rgba(0,0,0,0.32) 92%, transparent 100%); mask-image: linear-gradient(to right, #000 0, #000 70%, rgba(0,0,0,0.75) 82%, rgba(0,0,0,0.32) 92%, transparent 100%); }
