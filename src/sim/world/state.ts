@@ -74,6 +74,15 @@ export const SCOUT_SCOPES: { key: ScoutScope; name: string; blurb: string }[] = 
   { key: 'diaspora', name: 'Diaspora search', blurb: 'Foreign-born players who are eligible for Iran but undeclared.' },
 ]
 
+export interface NewsItem {
+  day: Day
+  kind: 'transfer' | 'form' | 'result' | 'injury' | 'intl'
+  text: string
+  /** Player the story is about, for the portrait and link. */
+  playerId?: number
+  link?: string
+}
+
 export interface World {
   version: number
   seed: number
@@ -103,6 +112,8 @@ export interface World {
   /** Result of each approach to a dual national: playerId → last day asked. */
   approaches: Record<number, Day>
   history: { year: number; comp: string; level: Level; result: string }[]
+  /** Short football news feed shown on the overview. */
+  news?: NewsItem[]
 }
 
 /** Runtime indexes rebuilt after load (not serialised). */

@@ -13,7 +13,7 @@ import { MatchSim } from './match/engine'
 import type { Tactic } from './match/tactics'
 import type { Frame, MatchReport, MatchSnapshot, MEvent, ShotRec } from './match/types'
 import { buildWorld } from './world/build'
-import { buildIndex, type Camp, type Index, type Message, type ScoutScope, type World } from './world/state'
+import { buildIndex, type Camp, type Index, type Message, type NewsItem, type ScoutScope, type World } from './world/state'
 import { LEVEL_NAME, natRef, parseRef, type Fixture, type Level, type Player } from './world/types'
 
 export interface AdvanceResult {
@@ -53,6 +53,7 @@ export class Game {
     for (const f of past) simClubFixture(w, this.idx, f, this.rng, none)
     for (const p of w.players) { p.injury = p.injury && p.injury.until > w.day ? p.injury : null; p.cond = 92 }
     for (const c of w.comps) progress(w, c, this.rng)
+    this.formNews()
     const ac = setupAsianCup(w, this.rng, 2027, toDay(2027, 12, 23), 'KSA', ASIAN_CUP_2027)
     planYear(w, this.rng, 2027, w.day)
     rerank(w)
@@ -66,6 +67,46 @@ export class Game {
   msg(cat: Message['cat'], title: string, body: string, important = false, link?: string) {
     this.w.inbox.push({ id: this.w.nextId.msg++, day: this.w.day, cat, title, body, read: false, important, link })
     if (this.w.inbox.length > 400) this.w.inbox.splice(0, this.w.inbox.length - 400)
+  }
+
+  news(kind: NewsItem['kind'], text: string, playerId?: number, link?: string) {
+    const n = (this.w.news ??= [])
+    n.push({ day: this.w.day, kind, text, playerId, link: link ?? (playerId != null ? `player:${playerId}` : undefined) })
+    if (n.length > 160) n.splice(0, n.length - 160)
+  }
+  /** Weekly round-up of Iranian players on hot or cold streaks at their clubs. */
+  private formNews() {
+    const w = this.w
+    const out: [number, Player, string][] = []
+    for (const p of w.players) {
+      if (p.retired || p.nat[0] !== 'IRN' || p.clubId == null || p.known < 55 || !p.recent || p.recent.length < 2) continue
+      if (p.lastNews != null && w.day - p.lastNews < 28) continue
+      const club = w.clubs[p.clubId]
+      const abroad = club.country !== 'IRN'
+      if (!abroad && p.ovr < 66 && p.caps === 0) continue
+      const last = (n: number) => p.recent!.slice(-n).reduce((a, x) => [a[0] + x[0], a[1] + x[1]], [0, 0])
+      const [g2, a2] = last(2)
+      const [g4, a4] = last(Math.min(4, p.recent.length))
+      const f3 = p.form.slice(-3)
+      const where = `for ${club.name}`
+      let text = ''
+      let weight = 0
+      if (g2 + a2 >= 4) { text = `${p.name} has ${g2 + a2} goal contributions in his last two matches ${where} (${g2} goals, ${a2} assists).`; weight = 10 + g2 + a2 }
+      else if (g2 >= 3) { text = `${p.name} has scored ${g2} goals in his last two matches ${where}.`; weight = 9 + g2 }
+      else if (p.recent.length >= 4 && g4 + a4 >= 5) { text = `${p.name} is in form ${where}: ${g4} goals and ${a4} assists in his last four matches.`; weight = 7 + g4 + a4 }
+      else if (f3.length === 3 && f3.every((r) => r >= 7.7)) { text = `${p.name} has been outstanding ${where}, rated ${f3.map((r) => r.toFixed(1)).join(', ')} in his last three matches.`; weight = 6 }
+      else if (p.caps >= 10 && f3.length === 3 && f3.every((r) => r <= 6.1)) { text = `${p.name} is struggling ${where}: three poor ratings in a row (${f3.map((r) => r.toFixed(1)).join(', ')}).`; weight = 5 }
+      else if (p.caps >= 10 && p.sharp < 42) { text = `${p.name} has fallen out of the team at ${club.name} and is short of match fitness.`; weight = 4 }
+      if (text) out.push([weight + (abroad ? 3 : 0) + p.ovr / 20, p, text])
+    }
+    out.sort((x, y) => y[0] - x[0])
+    for (const [, p, text] of out.slice(0, 5)) { p.lastNews = w.day; this.news('form', text, p.id) }
+    // serious injuries to known Iran players picked up in club matches this week
+    for (const p of w.players) {
+      if (p.retired || p.nat[0] !== 'IRN' || !p.injury || (p.caps < 5 && p.ovr < 70) || p.known < 55) continue
+      const len = p.injury.until - w.day
+      if (len >= 21 && (p.lastNews == null || w.day - p.lastNews > 6) && !(w.news ?? []).some((n) => n.kind === 'injury' && n.playerId === p.id && w.day - n.day < len + 30)) this.news('injury', `${p.name} is out for about ${Math.round(len / 7)} weeks with a ${p.injury.name.toLowerCase()}.`, p.id)
+    }
   }
 
   // ───────────────────────── squads ─────────────────────────
@@ -395,6 +436,7 @@ export class Game {
       w.fed.board = clamp(w.fed.board + delta, 0, 100)
       w.fed.media = clamp(w.fed.media + delta * 1.1, 0, 100)
       const scorers = sim.events.filter((e) => (e.type === 'goal' || e.type === 'pen') && e.team === me).map((e) => `${names[e.p!]?.split(' ').slice(-1)[0]} ${e.min}'`)
+      this.news('intl', `${sim.teams[0].name} ${f.hg}–${f.ag} ${sim.teams[1].name}${f.pens ? ` (${f.pens[0]}–${f.pens[1]} on penalties)` : ''} · ${comp.short}${scorers.length ? ' · ' + scorers.join(', ') : ''}`, undefined, `fixture:${f.id}`)
       this.msg('match', `${LEVEL_NAME[level]}: ${sim.teams[0].name} ${f.hg}–${f.ag} ${sim.teams[1].name}${f.pens ? ` (${f.pens[0]}–${f.pens[1]} pens)` : ''}`, `${comp.name}${comp.friendly ? '' : ' · ' + comp.stages[f.stage].name}.${scorers.length ? ' Scorers: ' + scorers.join(', ') + '.' : ''}${motm >= 0 ? ` Player of the match: ${names[motm]} (${best.toFixed(1)}).` : ''}`, level === 'senior', `fixture:${f.id}`)
     }
     this.afterFixture(f)
@@ -456,6 +498,20 @@ export class Game {
     const comp = this.w.comps[f.compId]
     if (comp.scope === 'club') {
       simClubFixture(this.w, this.idx, f, this.rng, away)
+      if (f.scorers?.length) {
+        const n = new Map<number, number>()
+        for (const [pid] of f.scorers) n.set(pid, (n.get(pid) ?? 0) + 1)
+        for (const [pid, g] of n) {
+          const p = this.w.players[pid]
+          if (g < 2 || !p || p.nat[0] !== 'IRN' || p.known < 55) continue
+          const club = this.w.clubs[p.clubId ?? -1]
+          if (!club || (club.country === 'IRN' && g < 3 && p.caps === 0)) continue
+          const home = f.home === `c:${club.id}`
+          const opp = teamName(this.w, home ? f.away : f.home).name
+          const [us, them] = home ? [f.hg, f.ag] : [f.ag, f.hg]
+          this.news('result', `${p.name} scored ${g === 2 ? 'twice' : g === 3 ? 'a hat-trick' : `${g} goals`} as ${club.name} ${us > them ? 'beat' : us === them ? 'drew with' : 'lost to'} ${opp} ${us}–${them}.`, p.id)
+        }
+      }
       this.afterFixture(f)
       return
     }
@@ -556,11 +612,13 @@ export class Game {
       }
     }
     if (dow === 1) {
+      this.formNews()
       this.scoutWeek()
       const moves = transferWeek(w, this.rng, w.day)
       if (moves.length) {
         this.idx = buildIndex(w)
         const notable = moves.filter((mv) => mv.player.ovr >= 66 || mv.to.country !== 'IRN').sort((a, b) => b.fee - a.fee)
+        for (const mv of notable.slice(0, 10)) this.news('transfer', `${mv.player.name} joins ${mv.to.name} from ${mv.from?.name ?? 'free agency'}${mv.fee ? ` for €${(mv.fee / 1e6).toFixed(2)}M` : ' on a free transfer'}.`, mv.player.id)
         for (const mv of notable.slice(0, 6)) {
           const abroad = mv.to.country !== 'IRN'
           this.msg('transfer', `${mv.player.name} joins ${mv.to.name}`, `${mv.player.name} (${mv.player.pos[0]}, ${Math.floor((w.day - mv.player.dob) / 365.25)}) moves from ${mv.from?.name ?? 'free agency'} to ${mv.to.name} (${w.leagues[mv.to.leagueId].name})${mv.fee ? ` for €${(mv.fee / 1e6).toFixed(2)}M` : ' on a free transfer'}.${abroad && mv.from?.country === 'IRN' ? ' Another player makes the step abroad.' : ''}`, false, `player:${mv.player.id}`)

@@ -64,6 +64,10 @@ export interface Player {
   contractEnd: Day
   /** Last club match ratings, newest last (max 8). */
   form: number[]
+  /** Goals and assists in recent club matches, newest last (max 6). */
+  recent?: [number, number][]
+  /** Day of the last form story about this player. */
+  lastNews?: Day
   /** 0–100 physical freshness. */
   cond: number
   /** 0–100 match sharpness from recent minutes. */

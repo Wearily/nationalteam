@@ -67,7 +67,9 @@ function credit(side: Side, goals: number, conceded: number, rng: Rng, f: Fixtur
   const diff = goals - conceded
   const involved: [Player, number][] = [...side.starters.map((p) => [p, 90] as [Player, number]), ...side.subs.map((p) => [p, rng.int(12, 35)] as [Player, number])]
   const rating = new Map<number, number>()
+  const ga = new Map<number, [number, number]>()
   for (const [p, mins] of involved) {
+    ga.set(p.id, [0, 0])
     const base = 6.45 + diff * 0.17 + (p.ovr - side.str) * 0.035 + rng.normal(0, 0.45 + (20 - p.traits.consistency) * 0.022)
     rating.set(p.id, mins < 45 ? 6.3 + (base - 6.3) * 0.6 : base)
     p.club.apps++
@@ -93,6 +95,7 @@ function credit(side: Side, goals: number, conceded: number, rng: Rng, f: Fixtur
     const min = rng.int(1, 90)
     if (scorer) {
       scorer.club.goals++
+      ga.get(scorer.id)![0]++
       rating.set(scorer.id, rating.get(scorer.id)! + 0.95)
       ;(f.scorers ??= []).push([scorer.id, min, sideIdx])
     }
@@ -102,7 +105,7 @@ function credit(side: Side, goals: number, conceded: number, rng: Rng, f: Fixtur
       for (const x of involved) {
         if (x[0] === scorer) continue
         ra -= wOf(AST_W, A.passing)(x)
-        if (ra <= 0) { x[0].club.assists++; rating.set(x[0].id, rating.get(x[0].id)! + 0.55); break }
+        if (ra <= 0) { x[0].club.assists++; ga.get(x[0].id)![1]++; rating.set(x[0].id, rating.get(x[0].id)! + 0.55); break }
       }
     }
   }
@@ -112,6 +115,8 @@ function credit(side: Side, goals: number, conceded: number, rng: Rng, f: Fixtur
     p.club.ratingSum += r
     p.form.push(r)
     if (p.form.length > 8) p.form.shift()
+    ;(p.recent ??= []).push(ga.get(p.id)!)
+    if (p.recent.length > 6) p.recent.shift()
     if (!best || r > rating.get(best.id)!) best = p
   }
   return best

@@ -1,12 +1,13 @@
 import { ArrowDownRight, ArrowUpRight, ChevronRight } from 'lucide-react'
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { fmtDay } from '../../sim/core/date'
 import { formAvg } from '../../sim/clubs/season'
 import { groupTables } from '../../sim/comps/engine'
 import type { GroupStage } from '../../sim/comps/types'
 import { teamName } from '../../sim/intl/select'
-import { LEVEL_NAME, type Fixture } from '../../sim/world/types'
-import { clubOf, Flag, FormDots, isAbroad, Meter, money, Ovr, PlayerLink, PosTag, Rating, tone } from '../bits'
+import { openSlots } from '../../sim/intl/calendar'
+import { LEVEL_NAME, type Fixture, type Level } from '../../sim/world/types'
+import { Avatar, clubOf, Flag, FormDots, isAbroad, Meter, money, Ovr, PlayerLink, PosTag, Rating, tone } from '../bits'
 import { FIFA_ISO } from '../flags'
 import { useGame } from '../store'
 
@@ -27,6 +28,82 @@ export function ResultRow({ f, mine = 'n:IRN:senior' }: { f: Fixture; mine?: str
       <span className="grow row" style={{ fontWeight: f.away === mine ? 650 : 480 }}>{f.away.startsWith('n:') && <Flag code={f.away.split(':')[1]} />}<span className="truncate">{a.name}</span></span>
       <span style={{ width: 86 }} className="faint truncate">{w.comps[f.compId].short}</span>
       {res ? <span className={`pill ${res === 'W' ? 'green' : res === 'L' ? 'red' : 'amber'}`}>{res}</span> : <span style={{ width: 28 }} />}
+    </div>
+  )
+}
+
+const NEWS_KIND: Record<string, [string, string]> = { transfer: ['Transfer', 'blue'], form: ['Form', 'green'], result: ['Result', 'amber'], injury: ['Injury', 'red'], intl: ['Iran', ''] }
+
+/** FM-style running feed: transfers, club performances, form streaks, injuries and Iran results. */
+export function NewsFeed() {
+  const { w, link, go } = useGame()
+  const world = w!
+  const [kind, setKind] = useState('all')
+  const items = [...(world.news ?? [])].reverse().filter((n) => kind === 'all' || n.kind === kind).slice(0, 14)
+  const ago = (d: number) => { const k = world.day - d; return k === 0 ? 'Today' : k === 1 ? 'Yesterday' : k < 7 ? `${k} days ago` : fmtDay(d, false) }
+  return (
+    <div className="card">
+      <div className="card-head"><h3>News</h3><button className="btn sm ghost right" onClick={() => go({ name: 'inbox' })}>Inbox <ChevronRight /></button></div>
+      <div className="seg" style={{ marginBottom: 10 }}>{['all', 'form', 'result', 'transfer', 'injury', 'intl'].map((k) => <button key={k} className={kind === k ? 'on' : ''} onClick={() => setKind(k)}>{k === 'all' ? 'All' : NEWS_KIND[k][0]}</button>)}</div>
+      {items.length === 0 && <div className="faint" style={{ padding: '10px 0' }}>Nothing to report yet. Stories appear here as club football is played.</div>}
+      {items.map((n, i) => {
+        const p = n.playerId != null ? world.players[n.playerId] : null
+        return (
+          <div key={i} className="row" style={{ padding: '10px 0', borderTop: i ? '1px solid rgba(255,255,255,0.06)' : 'none', alignItems: 'flex-start', cursor: n.link ? 'pointer' : 'default' }} onClick={() => link(n.link)}>
+            {p ? <Avatar p={p} size={38} /> : <span className="flag fi fi-ir" style={{ width: 38, height: 26, borderRadius: 5, marginTop: 6 }} />}
+            <div className="grow"><div style={{ lineHeight: 1.4 }}>{n.text}</div><div className="row" style={{ gap: 8, marginTop: 4 }}><span className={`pill ${NEWS_KIND[n.kind][1]}`}>{NEWS_KIND[n.kind][0]}</span><span className="faint" style={{ fontSize: 12 }}>{ago(n.day)}</span></div></div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+/** Things that need the president's attention, most urgent first. */
+export function Tasks() {
+  const { w, go } = useGame()
+  const world = w!
+  const tasks = useMemo(() => {
+    const out: { tone: string; title: string; sub: string; go: () => void; rank: number }[] = []
+    const manual = Object.values(world.teams).filter((t) => t.control === 'manual')
+    for (const f of world.fixtures) {
+      if (f.played || f.day !== world.day) continue
+      const ref = [f.home, f.away].find((r) => r.startsWith('n:IRN:'))
+      if (ref && world.teams[ref.split(':')[2] as Level].control === 'manual') out.push({ tone: 'red', title: `Match day: ${teamName(world, f.home).name} v ${teamName(world, f.away).name}`, sub: `${world.comps[f.compId].name}. Pick the eleven and kick off.`, go: () => go({ name: 'match', fixtureId: f.id }), rank: 0 })
+    }
+    for (const c of world.camps) {
+      if (c.done || c.announced || world.teams[c.level].control !== 'manual') continue
+      const d = c.from - world.day
+      if (d <= 0) out.push({ tone: 'red', title: `Name the ${LEVEL_NAME[c.level]} squad`, sub: `${c.label} · up to ${c.size} players · first match ${fmtDay(c.first, false)}`, go: () => go({ name: 'teams', level: c.level, tab: 'callup' }), rank: 1 })
+      else if (d <= 21) out.push({ tone: 'amber', title: `${LEVEL_NAME[c.level]} squad due in ${d} day${d === 1 ? '' : 's'}`, sub: `${c.label} · first match ${fmtDay(c.first, false)}`, go: () => go({ name: 'teams', level: c.level, tab: 'callup' }), rank: 3 })
+    }
+    for (const t of manual) {
+      const open = openSlots(world, t.level).filter((sl) => sl.day - world.day <= 150)
+      if (open.length) out.push({ tone: open[0].day - world.day <= 45 ? 'amber' : 'blue', title: `${open.length} open ${LEVEL_NAME[t.level]} match date${open.length === 1 ? '' : 's'}`, sub: `${open[0].window} window from ${fmtDay(open[0].day, false)}. Arrange friendlies or leave the dates free.`, go: () => go({ name: 'calendar' }), rank: open[0].day - world.day <= 45 ? 2 : 6 })
+    }
+    for (const t of Object.values(world.teams)) {
+      if (t.coachId == null) out.push({ tone: 'amber', title: `No ${LEVEL_NAME[t.level]} head coach`, sub: 'Appoint someone to run the team.', go: () => go({ name: 'staff' }), rank: 4 })
+      else if (world.staff[t.coachId].contractEnd - world.day < 60) out.push({ tone: 'blue', title: `${world.staff[t.coachId].name}'s contract is running out`, sub: `${LEVEL_NAME[t.level]} head coach, until ${fmtDay(world.staff[t.coachId].contractEnd, false)}. Renews automatically unless you replace him.`, go: () => go({ name: 'staff' }), rank: 7 })
+    }
+    if (!world.scouts.length) out.push({ tone: 'blue', title: 'No scouts are working', sub: 'Many players are only known as rating ranges. Assign scouts to regions.', go: () => go({ name: 'scouting' }), rank: 5 })
+    const keen = world.players.filter((p) => p.iranStatus === 'interested' && !p.retired)
+    if (keen.length) out.push({ tone: 'green', title: `${keen.length} dual national${keen.length === 1 ? ' is' : 's are'} open to Iran`, sub: `${keen.slice(0, 3).map((p) => p.name).join(', ')}. A second approach may settle it.`, go: () => go({ name: 'scouting' }), rank: 5 })
+    if (world.fed.budget < 0) out.push({ tone: 'red', title: 'The federation is in deficit', sub: 'Cut programme spending or the board will lose patience.', go: () => go({ name: 'federation' }), rank: 2 })
+    const unread = world.inbox.filter((m) => !m.read && m.important).length
+    if (unread) out.push({ tone: 'blue', title: `${unread} important message${unread === 1 ? '' : 's'} unread`, sub: 'Open the inbox.', go: () => go({ name: 'inbox' }), rank: 8 })
+    return out.sort((a, b) => a.rank - b.rank)
+  }, [world, go])
+  return (
+    <div className="card">
+      <div className="card-head"><h3>To do</h3><span className={`pill right ${tasks.some((t) => t.tone === 'red') ? 'red' : ''}`}>{tasks.length}</span></div>
+      {tasks.length === 0 && <div className="faint">Nothing needs you right now. Press Continue.</div>}
+      {tasks.slice(0, 7).map((t, i) => (
+        <button key={i} className="row" style={{ width: '100%', textAlign: 'left', padding: '10px 0', borderTop: i ? '1px solid rgba(255,255,255,0.06)' : 'none', alignItems: 'flex-start' }} onClick={t.go}>
+          <span style={{ width: 9, height: 9, borderRadius: 9, marginTop: 6, flex: 'none', background: t.tone === 'red' ? 'var(--red)' : t.tone === 'amber' ? 'var(--gold)' : t.tone === 'green' ? 'var(--green)' : 'var(--cyan)' }} />
+          <span className="grow"><b style={{ fontWeight: 650 }}>{t.title}</b><span className="faint" style={{ display: 'block', fontSize: 12.5 }}>{t.sub}</span></span>
+          <ChevronRight size={16} className="faint" style={{ marginTop: 3 }} />
+        </button>
+      ))}
     </div>
   )
 }
@@ -110,6 +187,8 @@ export function Home() {
           </div>
         </div>
         <div className="col" style={{ gap: 18 }}>
+          <Tasks />
+          <NewsFeed />
           {grp && comp && (
             <div className="card flush">
               <div className="card-head"><h3>{comp.short} · Group {'ABCDEFGH'[grp.gi]}</h3><button className="btn sm ghost right" onClick={() => go({ name: 'comps', id: comp.id })}>Full <ChevronRight /></button></div>
@@ -118,17 +197,6 @@ export function Home() {
               </tbody></table>
             </div>
           )}
-          <div className="card">
-            <div className="card-head"><h3>Latest</h3><button className="btn sm ghost right" onClick={() => go({ name: 'inbox' })}>Inbox <ChevronRight /></button></div>
-            <div className="col" style={{ gap: 12 }}>
-              {world.inbox.slice(-6).reverse().map((m) => (
-                <div key={m.id} style={{ cursor: 'pointer' }} onClick={() => go({ name: 'inbox' })}>
-                  <div className="row"><span style={{ fontWeight: m.read ? 500 : 650 }} className="truncate grow">{m.title}</span><span className="faint num" style={{ fontSize: 11.5 }}>{fmtDay(m.day, false)}</span></div>
-                  <div className="faint truncate" style={{ fontSize: 12 }}>{m.body.split('\n')[0]}</div>
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
       </div>
     </div>
