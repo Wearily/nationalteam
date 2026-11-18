@@ -60,15 +60,30 @@ for p in wplayers:
 iranians = [p for p in wplayers if 'IRN' in p['nat']]
 
 new_clubs, new_leagues, club_of_fm = [], [], {}
-def map_club(tid, tname, country, league_hint=None):
+# FotMob names that differ too much from the base data to match automatically
+CLUB_ALIAS = {'Sanat Naft Abadan': 'irn-sanat-naft', 'Naft Masjed Soleyman FC': 'irn-naft-m-i-s'}
+def map_club(tid, tname, country, league_hint=None, create=True):
     """FotMob team -> game club id (existing by name within country, else a new club)."""
     if tid in club_of_fm: return club_of_fm[tid]
+    known = CLUB_ALIAS.get(tname)
+    if known and any(c['id'] == known for c in clubs): club_of_fm[tid] = known; return known
     best, bs = None, 0
     for c in by_country.get(country, []):
         s_ = max(sim(norm(c['name']), norm(tname)), sim(norm(c.get('short') or c['name']), norm(tname)))
         if c['league'].startswith('other-'): s_ -= 0.03
         if s_ > bs: best, bs = c, s_
     if best and bs >= 0.8: club_of_fm[tid] = best['id']; return best['id']
+    # "Foolad Khuzestan" / "Foolad", "Shabab Al-Ahli Dubai FC" / "Shabab Al Ahli": one name contained in the other
+    STOP = {'fc', 'sc', 'club', 'cf', 'fk', 'ac'}
+    ft = [t for t in norm(tname).split() if t not in STOP]
+    sub = []
+    for c in by_country.get(country, []):
+        ct = [t for t in norm(c.get('short') or c['name']).split() if t not in STOP] or norm(c['name']).split()
+        if ct and ft and (set(ct) <= set(ft) or set(ft) <= set(ct)) and ft[0] == ct[0]: sub.append((len(set(ct) & set(ft)), not c['league'].startswith('other-'), c))
+    if sub:
+        sub.sort(key=lambda x: (-x[0], -x[1]))
+        club_of_fm[tid] = sub[0][2]['id']; return sub[0][2]['id']
+    if not create: return None
     lid = league_hint or f'other-{country.lower()}'
     if lid not in leagues:
         leagues[lid] = {'id': lid, 'name': f'{country} — other clubs', 'country': country, 'tier': 1, 'strength': 50, 'startMonth': 8}
@@ -84,7 +99,10 @@ def team(tid, league_hint=None, national=False):
     if not d: return None
     det = d.get('details') or {}
     country = nat_code(det.get('country'))
-    cid = None if national else (map_club(tid, det.get('name', ''), country, league_hint) if country else None)
+    members = sum(len(g.get('members') or []) for g in ((d.get('squad') or {}).get('squad') or []) if g.get('title') != 'coach')
+    # a club absent from the base data is only added when FotMob actually has a squad for it
+    cid = None if national else (map_club(tid, det.get('name', ''), country, league_hint, create=members >= 11) if country else None)
+    if not national and cid is None: return det
     for g in ((d.get('squad') or {}).get('squad') or []):
         if g.get('title') == 'coach': continue
         for m in (g.get('members') or []):
@@ -226,6 +244,6 @@ for p in ir_new + [x for x in iranians if x['id'] in patches and patches[x['id']
 print('new players', len(players), '(Iranian', len(ir_new), ') patched', len(patches), 'new clubs', len(new_clubs), 'new leagues', len(new_leagues), 'photos now', len(photos))
 print('club moves abroad (new or corrected):', dict(abroad.most_common(15)))
 print('skipped:', dict(skipped))
-for q in ('hoseinnejad', 'saiadmanesh'):
+for q in ('hoseinejad', 'saiadmanesh', 'jahanbaks', 'qodos'):
     hit = [(p['name'], p.get('club')) for p in players if q in squash(p['name'])] + [(x['name'], patches[x['id']].get('club', x.get('club'))) for x in wplayers if x['id'] in patches and q in squash(x['name'])]
     print(q, hit)

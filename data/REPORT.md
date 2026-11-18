@@ -226,3 +226,15 @@ Positions: 2046 squad players had no Wikidata position; their GK/DF/MF/FW label 
 npx tsx pipeline/run.ts          # everything (cached responses in pipeline/.cache are reused)
 npx tsx pipeline/07-validate.ts  # validate public/data/world.json
 ```
+
+
+## FotMob supplement (`public/data/fotmob.json`, built by `pipeline/10-fotmob-players.py`)
+
+Merged over `world.json` when a career is created.
+
+- Sources: squads of 34 Iranian clubs (Persian Gulf Pro League and Azadegan League), the Iran senior squad, and 128 individual look-ups (a seed list in `pipeline/iranians-abroad.seed.txt`, existing Iranians without an Iranian club, and players transferred out of Iranian clubs).
+- 264 new real players (254 Iranian); 348 existing players corrected (club, birth date, positions, height, foot, market value, shirt number); 11 clubs added.
+- Skipped: 18 players with no birth date on FotMob, 3 with no position.
+- Real market values feed the rating estimate; hand-set ratings in `data/overrides/ratings.json` still take priority.
+- Headshots: 474 players in `data/overrides/photos.json`.
+- Known gaps: youth national squads (U23/U20/U17) returned no squad lists; Iranians abroad are only found if they are in the senior squad, on the seed list, or already in the base data.
