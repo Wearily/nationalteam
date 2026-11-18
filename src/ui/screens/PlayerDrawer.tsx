@@ -104,11 +104,11 @@ export function PlayerProfile({ id }: { id: number }) {
             <div className="kv"><span>Condition</span><b style={{ color: p.injury ? '#ffb3b8' : undefined }}>{condLabel}</b></div>
           </div>
           <div className="infogrid">
-            <div className="kv"><span>Club</span><b>{c ? <>{c.logo ? <Crest colors={c.colors} logo={c.logo} /> : <Flag code={c.country} />}<span className="truncate">{c.name}</span></> : 'Free agent'}</b></div>
+            <div className="kv"><span>Club</span><b>{c ? <><Crest colors={c.colors} logo={c.logo} /><span className="truncate">{c.name}</span></> : 'Free agent'}</b></div>
             <div className="kv"><span>Market value</span><b className="num">{money(p.value)}</b></div>
             <div className="kv"><span>Scouting knowledge</span><b className="num">{Math.round(p.known)}%</b></div>
             <div className="facecol">{fs.labels.map((l, i) => <div key={l}><span>{({ PAC: 'Pace', SHO: 'Shooting', PAS: 'Passing', DRI: 'Dribbling', DEF: 'Defending', PHY: 'Physical', DIV: 'Diving', HAN: 'Handling', KIC: 'Kicking', REF: 'Reflexes', SPD: 'Speed', POS: 'Positioning' } as Record<string, string>)[l]}</span><b>{v.attrs ? fs.values[i] : '?'}</b></div>)}</div>
-            <div className="kv"><span>League</span><b><span className="truncate">{lg?.name ?? '–'}</span></b></div>
+            <div className="kv"><span>League</span><b>{lg && <Flag code={lg.country} />}<span className="truncate">{lg?.name ?? '–'}</span></b></div>
             <div className="kv"><span>Yearly wage</span><b className="num">{money(p.wage)}</b></div>
             <div className="kv"><span>Position</span><b>{POS_NAME[p.pos[0]]}</b></div>
             <div className="kv"><span>Contract until</span><b className="num">{c ? `30 Jun ${ymd(p.contractEnd).y}` : '–'}</b></div>

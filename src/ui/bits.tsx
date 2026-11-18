@@ -34,10 +34,10 @@ export function scoutView(p: Player): { exact: boolean; lo: number; hi: number; 
   return { exact: false, lo: p.ovr + off - Math.ceil(err / 2), hi: p.ovr + off + Math.floor(err / 2), potLo: p.pot + pOff - err, potHi: Math.min(95, p.pot + pOff + err), attrs: p.known >= 40 }
 }
 
-export function Flag({ code, lg }: { code: string; lg?: boolean }) {
+export function Flag({ code, lg, sm }: { code: string; lg?: boolean; sm?: boolean }) {
   const n = useGame((s) => s.w?.nations[code])
   const iso = FIFA_ISO[code]
-  if (iso) return <span className={`flag fi fi-${iso}${lg ? ' lg' : ''}`} title={n?.name ?? code} />
+  if (iso) return <span className={`flag fi fi-${iso}${lg ? ' lg' : ''}${sm ? ' sm' : ''}`} title={n?.name ?? code} />
   const [a, b] = n?.colors ?? ['#555', '#888']
   return <span className={`flag${lg ? ' lg' : ''}`} style={{ background: `linear-gradient(135deg, ${a} 0 55%, ${b} 55%)` }} title={n?.name ?? code}>{code}</span>
 }
