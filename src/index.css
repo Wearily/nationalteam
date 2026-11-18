@@ -472,3 +472,24 @@ h1 { font-size: 36px; font-weight: 720; } h2 { font-size: 22px; } h3 { font-size
 @media (max-width: 1540px) { .next-chip { display: none; } }
 .next-chip { min-width: 0; flex-shrink: 1; }
 @media (max-width: 1260px) { .top { gap: 14px; padding: 0 18px; } .pnav button { padding: 0 9px; font-size: 15px; } .page { padding: 20px 18px 32px; } .subnav { padding: 0 18px; } }
+
+/* scorers and red cards under the scoreline */
+.score-events { padding: 0 28px 14px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; color: var(--text-2); }
+.se-row { display: grid; grid-template-columns: 1fr 28px 1fr; gap: 14px; align-items: start; }
+.se-l { text-align: right; } .se-i { text-align: center; font-size: 13px; line-height: 1.5; }
+/* line-up pitch */
+.lp { position: relative; aspect-ratio: 1 / 1.08; border-radius: 14px; background: linear-gradient(180deg, #16202f, #111927); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06); overflow: hidden; }
+.lp .lines { position: absolute; inset: 0; width: 100%; height: 100%; }
+.lp-p { position: absolute; transform: translate(-50%, -50%); width: 104px; display: flex; flex-direction: column; align-items: center; gap: 5px; }
+.lp-f { position: relative; width: 52px; height: 52px; }
+.lp-av { display: block; width: 52px; height: 52px; border-radius: 50%; overflow: hidden; background: linear-gradient(180deg, #33435e, #1c2638); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.14); flex: none; }
+.lp-av img, .lp-av svg { width: 100%; height: 100%; object-fit: cover; object-position: 50% 0; }
+.lp-rt { position: absolute; right: -16px; top: -6px; padding: 1px 6px; border-radius: 99px; font-size: 11.5px; font-weight: 780; color: #fff; font-variant-numeric: tabular-nums; box-shadow: 0 2px 6px rgba(0,0,0,0.5); white-space: nowrap; }
+.lp-off { position: absolute; left: -22px; top: -8px; font-size: 10.5px; font-weight: 650; color: #ff9aa0; white-space: nowrap; }
+.lp-card { position: absolute; left: -4px; bottom: 0; width: 10px; height: 14px; border-radius: 2px; box-shadow: 0 1px 4px rgba(0,0,0,0.5); }
+.lp-goal { position: absolute; right: -10px; bottom: -3px; font-size: 12px; font-weight: 700; }
+.lp-n { font-size: 12.5px; font-weight: 600; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lp-subs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 12px; align-items: center; }
+.lp-subs .eyebrow { grid-column: 1 / -1; }
+.lp-sub { position: relative; display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 10px; background: rgba(255,255,255,0.045); font-size: 12.5px; text-align: left; min-width: 0; }
+.lp-sub .lp-av { width: 28px; height: 28px; } .lp-sub .lp-rt { position: static; margin-left: auto; }

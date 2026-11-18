@@ -5,7 +5,8 @@ import { teamName } from '../../sim/intl/select'
 import type { Tactic } from '../../sim/match/tactics'
 import type { Frame, MatchSnapshot, MEvent, PStats, ShotRec, TStats } from '../../sim/match/types'
 import { LEVEL_NAME, type Level } from '../../sim/world/types'
-import { Empty, Flag, OvrNum, PosTag, ratingColor } from '../bits'
+import { FORMATIONS } from '../../sim/match/tactics'
+import { Empty, Face, Flag, OvrNum, PosTag, ratingColor } from '../bits'
 import { sim, useGame } from '../store'
 import { normaliseTactic, TacticsEditor } from './Tactics'
 
@@ -167,6 +168,59 @@ export function RatingsTable({ ps, names, title, color, energy }: { ps: PStats[]
   )
 }
 
+/** Scorers and dismissals under the scoreline, home on the left, away on the right. */
+export function ScoreEvents({ events, names }: { events: MEvent[]; names: (id: number) => string }) {
+  const side = (t: number, types: string[]) => {
+    const m = new Map<number, string[]>()
+    for (const e of events) if (e.team === t && types.includes(e.type) && e.p != null) (m.get(e.p) ?? m.set(e.p, []).get(e.p)!).push(`${e.min}${e.plus ? `+${e.plus}` : ''}'${e.type === 'pen' ? ' (Pen)' : ''}`)
+    return [...m.entries()].map(([id, mins]) => `${names(id).split(' ').slice(-1)[0]} ${mins.join(', ')}`)
+  }
+  const rows: [string, string[], string[]][] = [['⚽', side(0, ['goal', 'pen']), side(1, ['goal', 'pen'])], ['🟥', side(0, ['red']), side(1, ['red'])]]
+  if (rows.every((r) => !r[1].length && !r[2].length)) return null
+  return (
+    <div className="score-events">
+      {rows.filter((r) => r[1].length || r[2].length).map(([icon, h, a]) => (
+        <div key={icon} className="se-row"><div className="se-l">{h.map((x) => <div key={x}>{x}</div>)}</div><span className="se-i">{icon}</span><div className="se-r">{a.map((x) => <div key={x}>{x}</div>)}</div></div>
+      ))}
+    </div>
+  )
+}
+
+/** FotMob-style line-up: the starting eleven on a pitch with portraits, ratings, cards, goals and substitution marks. */
+export function LineupPitch({ title, formation, lineup, ps, names, motm, color }: { title: string; formation: string; lineup: number[]; ps: PStats[]; names: (id: number) => string; motm: number; color: string }) {
+  const world = useGame((s) => s.w)
+  const open = useGame((s) => s.openPlayer)
+  const slots = FORMATIONS[formation] ?? FORMATIONS['4-3-3']
+  const st = new Map(ps.map((p) => [p.id, p]))
+  const subs = ps.filter((p) => p.played && p.subOn).sort((a, b) => (a.subOn ?? 0) - (b.subOn ?? 0))
+  const Chip = ({ p }: { p: PStats }) => <span className="lp-rt" style={{ background: ratingColor(p.rating) }}>{p.rating.toFixed(1)}{p.id === motm ? ' ★' : ''}</span>
+  const Who = ({ id }: { id: number }) => { const pl = world?.players[id]; return <span className="lp-av">{pl ? <Face p={pl} /> : null}</span> }
+  return (
+    <div className="card">
+      <div className="card-head"><span style={{ width: 10, height: 10, borderRadius: 3, background: color }} /><h3>{title}</h3><span className="faint right">{formation}</span></div>
+      <div className="lp">
+        <svg className="lines" viewBox="0 0 68 100" preserveAspectRatio="none" fill="none" stroke="rgba(255,255,255,0.16)" strokeWidth="0.3"><rect x="2" y="2" width="64" height="96" /><path d="M16 98 V83 H52 V98 M25 98 V92.5 H43 V98" /><path d="M2 2 H66" /><path d="M26 2 A8 8 0 0 0 42 2" /></svg>
+        {slots.map((sl, i) => {
+          const id = lineup[i]
+          const p = st.get(id)
+          if (!p) return null
+          return (
+            <button key={i} className="lp-p" style={{ left: `${10 + sl.y * 80}%`, top: `${sl.pos === 'GK' ? 88 : 72 - ((sl.x - 0.17) / 0.61) * 60}%` }} onClick={() => open(id)}>
+              <span className="lp-f"><Who id={id} /><Chip p={p} />
+                {p.subOff && <span className="lp-off">↩ {p.subOff}'</span>}
+                {(p.yellow > 0 || p.red > 0) && <span className="lp-card" style={{ background: p.red ? '#e5484d' : '#f5c518' }} />}
+                {p.goals > 0 && <span className="lp-goal">⚽{p.goals > 1 ? `×${p.goals}` : ''}</span>}
+              </span>
+              <span className="lp-n">{names(id).split(' ').slice(-1)[0]}</span>
+            </button>
+          )
+        })}
+      </div>
+      {subs.length > 0 && <div className="lp-subs"><span className="eyebrow">Substitutes</span>{subs.map((p) => <button key={p.id} className="lp-sub" onClick={() => open(p.id)}><Who id={p.id} /><span className="truncate">{names(p.id).split(' ').slice(-1)[0]} <span className="faint">↑{p.subOn}'</span>{p.goals > 0 ? ' ⚽' : ''}</span><Chip p={p} /></button>)}</div>}
+    </div>
+  )
+}
+
 const SPEEDS: [string, number][] = [['Slow', 8], ['Normal', 18], ['Fast', 45], ['Very fast', 140]]
 
 export function MatchCentre({ fixtureId }: { fixtureId: number }) {
@@ -308,6 +362,7 @@ export function MatchCentre({ fixtureId }: { fixtureId: number }) {
           </div>
           <div className="side away"><Flag code={f.away.split(':')[1]} lg /><b>{away.name}</b></div>
         </div>
+        <ScoreEvents events={seen} names={nameOf} />
         <div style={{ padding: '0 22px 6px' }}><Momentum data={snap.momentum.slice(0, last?.min ?? 1)} colors={colors} /></div>
         <div className="row" style={{ padding: '10px 22px 16px' }}>
           {live ? <>
@@ -350,7 +405,6 @@ export function ReportView({ id }: { id: number }) {
   if (!r) return <div className="page-inner"><div className="card"><Empty>This match report is no longer stored.</Empty></div></div>
   const colors: [string, string] = [r.home.colors[0], contrast(r.home.colors[0], r.away.colors[0]) < 140 ? r.away.colors[1] : r.away.colors[0]]
   const name = (pid: number) => r.names[pid] ?? '—'
-  const goals = (t: number) => r.events.filter((e) => (e.type === 'goal' || e.type === 'pen') && e.team === t)
   return (
     <div className="page-inner">
       <div className="card flush">
@@ -359,16 +413,17 @@ export function ReportView({ id }: { id: number }) {
           <div className="center"><div className="score">{r.score[0]}<span style={{ opacity: 0.35, margin: '0 14px' }}>–</span>{r.score[1]}</div><span className="pill">{r.pens ? `${r.pens[0]}–${r.pens[1]} on penalties` : r.et ? 'After extra time' : 'Full time'}</span></div>
           <div className="side away"><Flag code={r.away.ref.split(':')[1]} lg /><div><b>{r.away.name}</b><div className="muted">{r.away.formation}</div></div></div>
         </div>
-        <div className="grid g2" style={{ padding: '0 28px 14px' }}>
-          <div className="muted" style={{ textAlign: 'right' }}>{goals(0).map((e, i) => <div key={i}>{name(e.p!)} {e.min}'</div>)}</div>
-          <div className="muted">{goals(1).map((e, i) => <div key={i}>{name(e.p!)} {e.min}'</div>)}</div>
-        </div>
+        <ScoreEvents events={r.events} names={name} />
         <div style={{ padding: '0 22px 14px' }}><Momentum data={r.momentum} colors={colors} /></div>
       </div>
       <div className="grid" style={{ gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)', alignItems: 'start' }}>
         <div className="card"><div className="card-head"><h3>Match stats</h3></div><StatsPanel stats={r.stats} colors={colors} /></div>
         <div className="card"><div className="card-head"><h3>Shot map</h3>{r.motm >= 0 && <span className="right faint">Player of the match: <b style={{ color: 'var(--text)' }}>{name(r.motm)}</b></span>}</div><ShotMap shots={r.shots} colors={colors} /></div>
         <div className="card scroll" style={{ maxHeight: 520, padding: 10 }}><Feed events={r.events} /></div>
+      </div>
+      <div className="grid g2" style={{ alignItems: 'start' }}>
+        <LineupPitch title={r.home.name} formation={r.home.formation} lineup={r.lineups[0]} ps={r.players[0]} names={name} motm={r.motm} color={colors[0]} />
+        <LineupPitch title={r.away.name} formation={r.away.formation} lineup={r.lineups[1]} ps={r.players[1]} names={name} motm={r.motm} color={colors[1]} />
       </div>
       <div className="grid g2" style={{ alignItems: 'start' }}>
         <RatingsTable ps={r.players[0]} names={name} title={r.home.name} color={colors[0]} />
