@@ -25,6 +25,9 @@ interface State {
   playerId: number | null
   busy: string | null
   toast: string | null
+  /** Call-up selections in progress, per team level, kept while you look at other screens (and across reloads). */
+  drafts: Record<string, number[]>
+  setDraft: (level: string, ids: number[] | null) => void
   go: (r: Route) => void
   openPlayer: (id: number | null) => void
   setWorld: (w: World) => void
@@ -42,6 +45,14 @@ export const useGame = create<State>((set, get) => ({
   playerId: null,
   busy: null,
   toast: null,
+  drafts: (() => { try { return JSON.parse(localStorage.getItem('tm-drafts') ?? '{}') as Record<string, number[]> } catch { return {} } })(),
+  setDraft: (level, ids) => {
+    const drafts = { ...get().drafts }
+    if (ids) drafts[level] = ids
+    else delete drafts[level]
+    set({ drafts })
+    try { localStorage.setItem('tm-drafts', JSON.stringify(drafts)) } catch { /* private mode: the draft still lives for this session */ }
+  },
   go: (route) => set({ route, playerId: null }),
   openPlayer: (playerId) => set({ playerId }),
   setWorld: (w) => { set({ w }); void saveWorld(w) },
@@ -52,7 +63,8 @@ export const useGame = create<State>((set, get) => ({
     const extra = (await fetch(`${import.meta.env.BASE_URL}data/fotmob.json`).then((r) => (r.ok ? r.json() : null)).catch(() => null)) as RawExtra | null
     const w = await sim.newGame(raw, Math.floor(Math.random() * 2 ** 31), name, extra)
     get().setWorld(w)
-    set({ busy: null, route: { name: 'home' } })
+    set({ busy: null, route: { name: 'home' }, drafts: {} })
+    try { localStorage.removeItem('tm-drafts') } catch { /* ignore */ }
   },
   resume: async () => {
     const w = await loadSaved()

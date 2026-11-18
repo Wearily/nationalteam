@@ -1,5 +1,5 @@
 import { Sparkles, UserRound, Wand2 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { fmtDay } from '../../sim/core/date'
 import { formAvg } from '../../sim/clubs/season'
 import { posLine } from '../../sim/ratings/attributes'
@@ -18,15 +18,18 @@ export function Teams({ level, tab }: { level: Level; tab?: string }) {
   const camp = world.camps.find((c) => c.level === level && !c.done && c.from <= world.day)
   const nextCamp = world.camps.filter((c) => c.level === level && !c.done && c.from > world.day).sort((a, b) => a.from - b.from)[0]
   const cur = tab ?? (camp && !camp.announced && team.control === 'manual' ? 'callup' : 'squad')
-  const [pick, setPick] = useState<Set<number>>(new Set(team.squad))
-  useEffect(() => { setPick(new Set(team.squad)) }, [level, team.squad.length]) // eslint-disable-line
+  // the selection in progress lives in the store, so it survives looking at other screens
+  const draft = useGame((s) => s.drafts[level])
+  const setDraft = useGame((s) => s.setDraft)
+  const pick = useMemo(() => new Set((draft && camp && !camp.announced ? draft : team.squad).filter((id) => world.players[id] && !world.players[id].retired)), [draft, team.squad, world, camp])
+  const setPick = (next: Set<number> | ((s: Set<number>) => Set<number>)) => setDraft(level, [...(typeof next === 'function' ? next(pick) : next)])
   const squad = useMemo(() => team.squad.map((id) => world.players[id]), [world, team.squad])
   const ref = `n:IRN:${level}`
   const fixtures = useMemo(() => world.fixtures.filter((f) => f.home === ref || f.away === ref).sort((a, b) => a.day - b.day), [world, ref])
   const picked = [...pick].map((id) => world.players[id])
   const lines = ['GK', 'DEF', 'MID', 'ATT'] as const
   const toggle = (p: Player) => setPick((s) => { const n = new Set(s); if (n.has(p.id)) n.delete(p.id); else n.add(p.id); return n })
-  const announce = async () => { const err = await cmd<string | null>('announceSquad', level, [...pick], false); notify(err ?? `${LEVEL_NAME[level]} squad announced.`); if (!err) go({ name: 'teams', level, tab: 'squad' }) }
+  const announce = async () => { const err = await cmd<string | null>('announceSquad', level, [...pick], false); notify(err ?? `${LEVEL_NAME[level]} squad announced.`); if (!err) { setDraft(level, null); go({ name: 'teams', level, tab: 'squad' }) } }
   const suggest = async () => setPick(new Set(await cmd<number[]>('suggestSquad', level, camp?.size ?? 23)))
   const tactic = useMemo(() => normaliseTactic(team.tactic, squad), [team.tactic, squad])
   const abroadN = picked.filter((p) => isAbroad(world, p)).length
