@@ -6,6 +6,7 @@ import { dynOvr } from '../sim/ratings/dynamic'
 import type { World } from '../sim/world/state'
 import type { Player, Pos } from '../sim/world/types'
 import LOGOS from '../../data/overrides/logos.json'
+import PHOTOS from '../../data/overrides/photos.json'
 import { FIFA_ISO } from './flags'
 import { useGame } from './store'
 
@@ -112,8 +113,11 @@ export function Portrait({ p, kit }: { p: Player; kit?: string }) {
     </svg>
   )
 }
+/** Headshot path: FotMob-sourced override by player id first, then the dataset's own photo. */
+export const playerPhoto = (p: Player): string | undefined => (p.rid ? (PHOTOS as Record<string, string>)[p.rid] : undefined) ?? p.photo
 export function Face({ p }: { p: Player }) {
-  return p.photo ? <img src={`${import.meta.env.BASE_URL}${p.photo}`} alt="" loading="lazy" /> : <Portrait p={p} />
+  const src = playerPhoto(p)
+  return src ? <img src={`${import.meta.env.BASE_URL}${src}`} alt="" loading="lazy" /> : <Portrait p={p} />
 }
 export function Avatar({ p, size = 28 }: { p: Player; size?: number }) {
   return <span className="avatar" style={{ width: size, height: size }}><Face p={p} /></span>

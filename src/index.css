@@ -401,3 +401,10 @@ h1 { font-size: 36px; font-weight: 720; } h2 { font-size: 22px; } h3 { font-size
 
 .flag.sm { width: 16px; height: 11px; border-radius: 2px; }
 .kv .crest, .kv .crest-img { width: 26px; height: 26px; }
+
+/* cut-out headshots (transparent background): sit on a soft plate instead of a hard circle crop */
+.avatar { background: linear-gradient(180deg, #2a3850, #172134); }
+.avatar img { object-position: 50% 0; }
+.profile-face .face img { border-radius: 0; object-fit: contain; object-position: 50% 100%; }
+.pcard .f img { object-fit: cover; object-position: 50% 0; }
+.fcard-face img { object-position: 50% 0; }
