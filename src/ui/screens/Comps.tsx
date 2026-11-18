@@ -2,8 +2,9 @@ import { useMemo, useState } from 'react'
 import { fmtDay, fmtDow, monthName, ymd } from '../../sim/core/date'
 import { groupTables, stageFixtures } from '../../sim/comps/engine'
 import type { Comp, GroupStage, KoStage, Row } from '../../sim/comps/types'
+import { openSlots } from '../../sim/intl/calendar'
 import { teamName } from '../../sim/intl/select'
-import { LEVEL_NAME, type Fixture, type TeamRef } from '../../sim/world/types'
+import { LEVEL_NAME, type Fixture, type Level, type Nation, type TeamRef } from '../../sim/world/types'
 import { clubLogo, Crest, Empty, Flag } from '../bits'
 import { useGame } from '../store'
 
@@ -105,6 +106,22 @@ export function Comps({ id }: { id?: number }) {
   )
 }
 
+function SlotRow({ level, day, window, nations }: { level: Level; day: number; window: string; nations: Nation[] }) {
+  const { w, cmd, notify } = useGame()
+  const [opp, setOpp] = useState('')
+  const [home, setHome] = useState(true)
+  const n = opp ? w!.nations[opp] : null
+  const fee = n ? Math.max(0, Math.round(((n.level - 62) * 45_000) / 10_000) * 10_000) * (level === 'senior' ? 1 : 0.15) : 0
+  return (
+    <div className="row" style={{ padding: '3px 0' }} title={`${window} window`}>
+      <span className="num" style={{ width: 54, fontSize: 13 }}>{fmtDay(day, false)}</span><span className="pill">{LEVEL_NAME[level]}</span>
+      <select className="input grow" value={opp} onChange={(e) => setOpp(e.target.value)}><option value="">Choose opponent…</option>{nations.map((x) => <option key={x.code} value={x.code}>#{x.rank} {x.name}</option>)}</select>
+      <div className="seg"><button className={home ? 'on' : ''} onClick={() => setHome(true)}>H</button><button className={!home ? 'on' : ''} onClick={() => setHome(false)}>A</button></div>
+      <button className="btn sm primary" disabled={!opp} onClick={() => void cmd<string>('bookFriendly', level, day, opp, home).then(notify)}>{fee ? `Book · €${Math.round(fee / 1000)}K` : 'Book'}</button>
+    </div>
+  )
+}
+
 export function Calendar() {
   const { w, cmd, notify } = useGame()
   const world = w!
@@ -112,13 +129,14 @@ export function Calendar() {
   const fx = useMemo(() => world.fixtures.filter((f) => (level === 'all' ? f.home.startsWith('n:IRN:') || f.away.startsWith('n:IRN:') : f.home === 'n:IRN:senior' || f.away === 'n:IRN:senior') && f.day >= world.day - 120).sort((a, b) => a.day - b.day), [world, level])
   const months = new Map<string, Fixture[]>()
   for (const f of fx) { const { y, m } = ymd(f.day); const k = `${monthName(m)} ${y}`; (months.get(k) ?? months.set(k, []).get(k)!).push(f) }
-  const friendlies = fx.filter((f) => !f.played && world.comps[f.compId].friendly && f.day - world.day >= 10).slice(0, 8)
+  const friendlies = fx.filter((f) => !f.played && world.comps[f.compId].friendly && f.day - world.day >= 10).slice(0, 10)
   const nations = useMemo(() => Object.values(world.nations).filter((n) => n.code !== 'IRN').sort((a, b) => a.rank - b.rank), [world])
+  const slots = useMemo(() => (Object.values(world.teams).filter((t) => t.control === 'manual' && (level === 'all' || t.level === 'senior')).flatMap((t) => openSlots(world, t.level).map((sl) => ({ ...sl, level: t.level })))).sort((x, y) => x.day - y.day), [world, level])
   const camps = world.camps.filter((c) => !c.done && (level === 'all' || c.level === 'senior')).sort((a, b) => a.from - b.from).slice(0, 6)
   return (
     <div className="page-inner">
       <div className="seg" style={{ alignSelf: 'flex-start' }}><button className={level === 'senior' ? 'on' : ''} onClick={() => setLevel('senior')}>Senior team</button><button className={level === 'all' ? 'on' : ''} onClick={() => setLevel('all')}>All Iran teams</button></div>
-      <div className="grid g-main" style={{ alignItems: 'start' }}>
+      <div className="grid" style={{ alignItems: 'start', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)' }}>
         <div className="col" style={{ gap: 18 }}>
           {[...months.entries()].map(([k, list]) => (
             <div key={k} className="card"><div className="card-head"><h3>{k}</h3></div>
@@ -128,12 +146,17 @@ export function Calendar() {
           {!fx.length && <div className="card"><Empty>No fixtures scheduled.</Empty></div>}
         </div>
         <div className="col" style={{ gap: 18 }}>
-        <div className="card col"><h3>Arrange friendlies</h3>
-          <span className="faint" style={{ fontSize: 12 }}>Friendlies are booked automatically in free international windows. Pick a different opponent here: stronger nations sharpen the squad and move the ranking more, but charge a match fee and may say no.</span>
-          {friendlies.length ? friendlies.map((f) => { const opp = (f.home.startsWith('n:IRN:') ? f.away : f.home).split(':')[1]; return (
-            <div key={f.id} className="row" style={{ padding: '4px 0' }}><span className="faint num" style={{ width: 58, fontSize: 12 }}>{fmtDay(f.day, false)}</span><span className="pill">{LEVEL_NAME[f.home.split(':')[2] as 'u23']}</span>
-              <select className="input grow" value={opp} onChange={(e) => void cmd<string>('arrangeFriendly', f.id, e.target.value).then(notify)}>{nations.map((n) => <option key={n.code} value={n.code}>#{n.rank} {n.name}</option>)}</select></div>
-          ) }) : <span className="faint">No friendlies far enough ahead to change.</span>}
+        <div className="card col"><h3>Friendlies</h3>
+          <span className="faint" style={{ fontSize: 13 }}>For teams you manage, the international windows start empty and you choose the opponents. Stronger nations sharpen the squad and move the ranking more, but charge a match fee and may say no. Coach-run teams arrange their own.</span>
+          {slots.length > 0 && <div className="eyebrow" style={{ marginTop: 6 }}>Open dates</div>}
+          {slots.slice(0, 10).map((sl) => <SlotRow key={`${sl.level}${sl.day}`} level={sl.level} day={sl.day} window={sl.window} nations={nations} />)}
+          {friendlies.length > 0 && <div className="eyebrow" style={{ marginTop: 6 }}>Booked</div>}
+          {friendlies.map((f) => { const home = f.home.startsWith('n:IRN:'); const opp = (home ? f.away : f.home).split(':')[1]; return (
+            <div key={f.id} className="row" style={{ padding: '3px 0' }}><span className="num" style={{ width: 54, fontSize: 13 }}>{fmtDay(f.day, false)}</span><span className="pill">{LEVEL_NAME[f.home.split(':')[2] as 'u23']} · {home ? 'H' : 'A'}</span>
+              <select className="input grow" value={opp} onChange={(e) => void cmd<string>('arrangeFriendly', f.id, e.target.value).then(notify)}>{nations.map((n) => <option key={n.code} value={n.code}>#{n.rank} {n.name}</option>)}</select>
+              <button className="btn sm danger" onClick={() => void cmd<string>('cancelFriendly', f.id).then(notify)}>Cancel</button></div>
+          ) })}
+          {!slots.length && !friendlies.length && <span className="faint">No open dates in the coming windows.</span>}
         </div>
         <div className="card col"><h3>Squad deadlines</h3>
           {camps.length ? camps.map((c) => <div key={c.id} className="row" style={{ padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.045)' }}><div className="grow"><b>{c.label}</b><div className="faint" style={{ fontSize: 12 }}>{LEVEL_NAME[c.level]} · up to {c.size} players · first match {fmtDay(c.first, false)}</div></div><span className={`pill ${c.announced ? 'green' : c.from <= world.day ? 'red' : ''}`}>{c.announced ? 'Named' : fmtDay(c.from, false)}</span></div>) : <span className="faint">Nothing due.</span>}

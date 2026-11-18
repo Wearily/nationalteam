@@ -45,27 +45,42 @@ export function addFriendly(w: World, level: Level, day: Day, opp: string, home:
   const comp = friendlyComp(w, level, ymd(day).y)
   const iran = natRef('IRN', level)
   const o = natRef(opp, level)
-  return addFixture(w, { day, compId: comp.id, stage: 0, home: home ? iran : o, away: home ? o : iran, neutral: !home && Math.abs(day % 3) === 0 })
+  return addFixture(w, { day, compId: comp.id, stage: 0, home: home ? iran : o, away: home ? o : iran })
 }
 
-/** Fill a year's international windows with friendlies for every Iran team that has nothing booked. */
-export function scheduleYear(w: World, rng: Rng, year: number, from: Day) {
-  const busy = (level: Level, day: Day) => w.fixtures.some((f) => !f.played && Math.abs(f.day - day) <= 2 && (f.home === natRef('IRN', level) || f.away === natRef('IRN', level)))
-  const perLevel: Record<Level, number[]> = { senior: [0, 1, 2, 3], u23: [0, 1, 2, 3], u21: [0, 2], u20: [0, 1, 2, 3], u19: [1, 3], u17: [0, 1, 2, 3], u16: [1, 2], u15: [0, 2] }
+const PER_LEVEL: Record<Level, number[]> = { senior: [0, 1, 2, 3], u23: [0, 1, 2, 3], u21: [0, 2], u20: [0, 1, 2, 3], u19: [1, 3], u17: [0, 1, 2, 3], u16: [1, 2], u15: [0, 2] }
+const iranBusy = (w: World, level: Level, day: Day) => w.fixtures.some((f) => !f.played && Math.abs(f.day - day) <= 2 && (f.home === natRef('IRN', level) || f.away === natRef('IRN', level)))
+
+/** Match dates available to a team inside the year's international windows. */
+export function slotDays(level: Level, year: number): { day: Day; window: string }[] {
   const ws = windows(year)
-  for (const level of Object.keys(perLevel) as Level[]) {
+  const out: { day: Day; window: string }[] = []
+  for (const wi of PER_LEVEL[level]) {
+    const win = ws[wi]
+    for (const d of level === 'senior' ? win.days : win.days.slice(0, 2)) out.push({ day: d + (level === 'senior' ? 0 : 1), window: win.name })
+  }
+  return out
+}
+/** Window dates with nothing booked yet, far enough ahead to arrange a match. */
+export function openSlots(w: World, level: Level): { day: Day; window: string }[] {
+  const y = ymd(w.day).y
+  return [...slotDays(level, y), ...slotDays(level, y + 1)].filter((s) => s.day - w.day >= 10 && s.day - w.day <= 400 && !iranBusy(w, level, s.day))
+}
+
+/**
+ * Book friendlies in free window dates for teams run by their coach.
+ * Teams the user manages are left alone: the user arranges those from the Calendar.
+ */
+export function scheduleYear(w: World, rng: Rng, year: number, from: Day) {
+  for (const level of Object.keys(PER_LEVEL) as Level[]) {
+    if (w.teams[level]?.control === 'manual') continue
     const used = new Set<string>()
-    for (const wi of perLevel[level]) {
-      const win = ws[wi]
-      const days = level === 'senior' ? win.days : win.days.slice(0, 2)
-      days.forEach((d, k) => {
-        const day = d + (level === 'senior' ? 0 : 1)
-        if (day <= from || busy(level, day)) return
-        const opp = pickOpponent(w, rng, level, used)
-        used.add(opp)
-        addFriendly(w, level, day, opp, k % 2 === 0)
-      })
-    }
+    slotDays(level, year).forEach((s, k) => {
+      if (s.day <= from + 9 || iranBusy(w, level, s.day)) return
+      const opp = pickOpponent(w, rng, level, used)
+      used.add(opp)
+      addFriendly(w, level, s.day, opp, k % 2 === 0)
+    })
   }
 }
 

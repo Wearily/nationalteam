@@ -65,12 +65,13 @@ export function Home() {
                 <div className="col center" style={{ alignItems: 'center', gap: 12 }}><span className={`flag xl fi fi-${FIFA_ISO[oppCode] ?? 'xx'}`} /><h1>{opp.name}</h1><span className="muted">#{world.nations[oppCode]?.rank ?? '–'} in the world</span></div>
               </div>
               <div className="row" style={{ justifyContent: 'center' }}>
+                {next.day - world.day > 60 && world.teams.senior.control === 'manual' && <button className="btn primary" onClick={() => go({ name: 'calendar' })}>Arrange friendlies</button>}
                 <button className="btn" onClick={() => go({ name: 'teams', level: 'senior', tab: 'callup' })}>Squad</button>
                 <button className="btn" onClick={() => go({ name: 'teams', level: 'senior', tab: 'tactics' })}>Tactics</button>
                 <button className="btn" onClick={() => go({ name: 'comps', id: next.compId })}>Competition <ChevronRight /></button>
               </div>
             </>
-          ) : <div className="muted">No fixtures scheduled.</div>}
+          ) : <div className="col center" style={{ alignItems: 'center', gap: 14, padding: '34px 0' }}><span className="eyebrow">Senior team</span><h1 style={{ fontSize: 34 }}>No match booked</h1><span className="muted" style={{ maxWidth: 460 }}>The next international window is open. Choose opponents for the dates you want to use.</span><button className="btn primary go" onClick={() => go({ name: 'calendar' })}>Arrange friendlies <ChevronRight /></button></div>}
         </div>
         <div className="card col" style={{ gap: 16 }}>
           <div className="row"><h3>Standing</h3><button className="btn sm ghost right" onClick={() => go({ name: 'federation' })}>Federation <ChevronRight /></button></div>

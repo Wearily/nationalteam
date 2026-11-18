@@ -6,7 +6,7 @@ import { seasonYearFor, simClubFixture, startLeagueSeason } from './clubs/season
 import { transferWeek } from './clubs/transfers'
 import { progress } from './comps/engine'
 import type { Comp, GroupStage, KoStage } from './comps/types'
-import { ASIAN_CUP_2027, planYear, rebuildCamps, setupAsianCup, setupWorldCup } from './intl/calendar'
+import { addFriendly, ASIAN_CUP_2027, openSlots, planYear, rebuildCamps, scheduleYear, setupAsianCup, setupWorldCup } from './intl/calendar'
 import { applyRanking, rerank } from './intl/ranking'
 import { aiTactic, buildMTeam, eligible, pickSquad, selectionScore, teamName } from './intl/select'
 import { MatchSim } from './match/engine'
@@ -58,7 +58,7 @@ export class Game {
     rerank(w)
     w.rankHist.push([w.day, w.nations.IRN.rank])
     this.idx = buildIndex(w)
-    this.msg('board', `Welcome, ${w.managerName}`, `You have been elected head of the federation. The senior side is ranked ${w.nations.IRN.rank}${ordSuffix(w.nations.IRN.rank)} in the world and the ${ac.name} begins on ${fmtDay((ac.stages[0] as { days: Day[] }).days[0])}.\n\nBefore then come the 2027 international windows. The board expects a place in the semi-finals. You manage the senior team directly; the youth sides are run by their coaches unless you take control from the Teams screen.`, true)
+    this.msg('board', `Welcome, ${w.managerName}`, `You have been elected head of the federation. The senior side is ranked ${w.nations.IRN.rank}${ordSuffix(w.nations.IRN.rank)} in the world and the ${ac.name} begins on ${fmtDay((ac.stages[0] as { days: Day[] }).days[0])}.\n\nBefore then come the 2027 international windows: the dates are open, and arranging the senior team's friendlies is up to you (Home → Calendar). The board expects a place in the semi-finals. You manage the senior team directly; the youth sides are run by their coaches unless you take control from the Teams screen.`, true)
     this.save()
   }
   save() { this.w.rng = this.rng.s }
@@ -236,26 +236,56 @@ export class Game {
     const n = this.w.nations[opp]
     return n ? Math.max(0, Math.round(((n.level - 62) * 45_000) / 10_000) * 10_000) : 0
   }
-  /** Swap the opponent of an upcoming friendly. Stronger nations charge a fee and may decline. */
-  arrangeFriendly(fixtureId: number, opp: string): string {
+  private friendlyCheck(level: Level, day: Day, opp: string, skip?: Fixture): string | null {
     const w = this.w
-    const f = w.fixtures.find((x) => x.id === fixtureId)
     const n = w.nations[opp]
-    if (!f || f.played || !n || !w.comps[f.compId].friendly) return 'That fixture cannot be changed.'
-    if (f.day - w.day < 10) return 'Too late: opponents need at least ten days\' notice.'
-    const iranHome = f.home.startsWith('n:IRN:')
-    const level = (iranHome ? f.home : f.away).split(':')[2] as Level
-    if (opp === 'IRN') return 'Choose another nation.'
-    if (w.fixtures.some((x) => x !== f && !x.played && Math.abs(x.day - f.day) <= 5 && (x.home === natRef(opp, level) || x.away === natRef(opp, level)))) return `${n.name} already have a match in that window.`
+    if (!n || opp === 'IRN') return 'Choose another nation.'
+    if (w.fixtures.some((x) => x !== skip && !x.played && Math.abs(x.day - day) <= 2 && (x.home === natRef(opp, level) || x.away === natRef(opp, level)))) return `${n.name} already have a match on that date.`
     const cost = level === 'senior' ? this.friendlyCost(opp) : Math.round(this.friendlyCost(opp) * 0.15)
     if (w.fed.budget < cost) return `The federation cannot afford the ${n.name} match fee.`
     // big nations are choosy about opponents ranked well below them
     const gap = n.level - w.nations.IRN.level
     if (gap > 5 && this.rng.chance(Math.min(0.85, (gap - 5) * 0.09))) return `${n.name} declined: they have other plans for that date.`
-    if (iranHome) f.away = natRef(opp, level); else f.home = natRef(opp, level)
     if (cost) { w.fed.budget -= cost; w.fed.ledger.push({ day: w.day, label: `Friendly against ${n.name}`, amount: -cost }) }
+    return null
+  }
+  /** Book a friendly on an open international-window date. */
+  bookFriendly(level: Level, day: Day, opp: string, home: boolean): string {
+    const w = this.w
+    if (!openSlots(w, level).some((s) => s.day === day)) return 'That date is no longer available.'
+    const err = this.friendlyCheck(level, day, opp)
+    if (err) return err
+    addFriendly(w, level, day, opp, home)
+    rebuildCamps(w)
     this.idx = buildIndex(w)
-    return `Friendly against ${n.name} confirmed${cost ? ` for a fee of €${(cost / 1000).toFixed(0)}K` : ''}.`
+    return `Friendly ${home ? 'at home to' : 'away to'} ${w.nations[opp].name} booked for ${fmtDay(day)}.`
+  }
+  /** Swap the opponent of an upcoming friendly. */
+  arrangeFriendly(fixtureId: number, opp: string): string {
+    const w = this.w
+    const f = w.fixtures.find((x) => x.id === fixtureId)
+    if (!f || f.played || !w.comps[f.compId].friendly) return 'That fixture cannot be changed.'
+    if (f.day - w.day < 10) return 'Too late: opponents need at least ten days\' notice.'
+    const iranHome = f.home.startsWith('n:IRN:')
+    const level = (iranHome ? f.home : f.away).split(':')[2] as Level
+    const err = this.friendlyCheck(level, f.day, opp, f)
+    if (err) return err
+    if (iranHome) f.away = natRef(opp, level); else f.home = natRef(opp, level)
+    this.idx = buildIndex(w)
+    return `Friendly against ${w.nations[opp].name} confirmed.`
+  }
+  cancelFriendly(fixtureId: number): string {
+    const w = this.w
+    const f = w.fixtures.find((x) => x.id === fixtureId)
+    if (!f || f.played || !w.comps[f.compId].friendly) return 'That fixture cannot be cancelled.'
+    if (f.day - w.day < 10) return 'Too late to cancel: the match is less than ten days away.'
+    const level = (f.home.startsWith('n:IRN:') ? f.home : f.away).split(':')[2] as Level
+    w.fixtures = w.fixtures.filter((x) => x !== f)
+    // drop camps that no longer have a match, then rebuild
+    w.camps = w.camps.filter((c) => c.done || c.announced || c.level !== level)
+    rebuildCamps(w)
+    this.idx = buildIndex(w)
+    return 'Friendly cancelled.'
   }
   setControl(level: Level, control: 'manual' | 'auto') { this.w.teams[level].control = control }
   setTactic(level: Level, tac: Tactic) { this.w.teams[level].tactic = tac }
@@ -517,6 +547,14 @@ export class Game {
       if (p.cond < 100) p.cond = Math.min(100, p.cond + 7)
       if (p.injury && p.injury.until <= w.day) p.injury = null
     }
+    for (const t of Object.values(w.teams)) {
+      if (t.control !== 'manual') continue
+      const open = openSlots(w, t.level).filter((sl) => sl.day - w.day === 45 || sl.day - w.day === 20)
+      if (open.length) {
+        const all = openSlots(w, t.level).filter((sl) => sl.window === open[0].window && Math.abs(sl.day - open[0].day) < 20)
+        this.msg('match', `${LEVEL_NAME[t.level]}: ${all.length} open date${all.length === 1 ? '' : 's'} in the ${open[0].window} window`, `No match is booked for ${all.map((sl) => fmtDay(sl.day, false)).join(', ')}. Arrange friendlies from Home → Calendar, or leave the dates free and the players stay with their clubs. Opponents need at least ten days' notice.`, t.level === 'senior' && open[0].day - w.day === 45)
+      }
+    }
     if (dow === 1) {
       this.scoutWeek()
       const moves = transferWeek(w, this.rng, w.day)
@@ -535,6 +573,8 @@ export class Game {
       rerank(w)
       w.rankHist.push([w.day, w.nations.IRN.rank])
       this.finance()
+      scheduleYear(w, this.rng, y, w.day)
+      rebuildCamps(w)
       for (const lg of w.leagues) {
         if (lg.virtual || lg.startMonth !== m) continue
         const key = `lg:${lg.rid}:${y}`
