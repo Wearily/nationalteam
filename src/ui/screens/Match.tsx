@@ -245,7 +245,7 @@ export function MatchCentre({ fixtureId }: { fixtureId: number }) {
   const [speed, setSpeed] = useState(18)
   const [tab, setTab] = useState<'feed' | 'stats' | 'players' | 'shots'>('feed')
   const [panel, setPanel] = useState(false)
-  const [coachOn, setCoachOn] = useState(false)
+  const [coachOn, setCoachOn] = useState(true)
   const coach = team.coachId != null ? world.staff[team.coachId] : null
   const frames = useRef<Frame[]>([])
   const clock = useRef(0)
