@@ -496,3 +496,12 @@ h1 { font-size: 36px; font-weight: 720; } h2 { font-size: 22px; } h3 { font-size
 
 /* longer, softer dissolve on the right edge of full-height profile photos */
 .profile-face.full .photo, .profile-face.full::after { -webkit-mask-image: linear-gradient(to right, #000 0, #000 70%, rgba(0,0,0,0.75) 82%, rgba(0,0,0,0.32) 92%, transparent 100%); mask-image: linear-gradient(to right, #000 0, #000 70%, rgba(0,0,0,0.75) 82%, rgba(0,0,0,0.32) 92%, transparent 100%); }
+
+/* fixed-layout tables: column widths never change with the rows currently on screen */
+.t.fixed { table-layout: fixed; width: 100%; }
+.t.fixed td { overflow: hidden; text-overflow: ellipsis; }
+.t.fixed td > .row { min-width: 0; }
+.t.fixed td .truncate { min-width: 0; display: block; }
+
+.flag.sm { margin-right: 5px; vertical-align: -1px; }
+.t.fixed td:first-child { text-overflow: clip; }

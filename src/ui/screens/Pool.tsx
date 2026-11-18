@@ -49,6 +49,9 @@ export function PoolTable({ level, selected, onToggle, height = 640, limit }: { 
   const parent = useRef<HTMLDivElement>(null)
   const virt = useVirtualizer({ count: rows.length, getScrollElement: () => parent.current, estimateSize: () => 45, overscan: 14 })
   const th = (k: SortKey, label: string, cls = 'c') => <th className={`${cls} sort`} onClick={() => setSort(([ck, d]) => (ck === k ? [k, -d] : [k, k === 'name' ? 1 : -1]))}>{label}{sort[0] === k ? (sort[1] < 0 ? ' ↓' : ' ↑') : ''}</th>
+  // in the call-up builder the table shares the row with the squad panel, so it drops two columns
+  const slim = !!onToggle
+  const cols = 11 + (onToggle ? 1 : 0) - (slim ? 2 : 0)
   const items = virt.getVirtualItems()
   const padTop = items.length ? items[0].start : 0
   const padBot = items.length ? virt.getTotalSize() - items[items.length - 1].end : 0
@@ -63,10 +66,11 @@ export function PoolTable({ level, selected, onToggle, height = 640, limit }: { 
         <span className="faint right num">{rows.length} players</span>
       </div>
       <div ref={parent} className="scroll grow">
-        <table className="t">
-          <thead><tr>{onToggle && <th style={{ width: 44 }} />}{th('name', 'Player', '')}<th>Pos</th>{th('age', 'Age')}{th('ovr', 'Ovr')}{th('pot', 'Pot')}<th>Club</th>{th('mins', 'Mins')}{th('goals', 'G/A')}<th className="c">Last 5</th>{th('form', 'Form')}{th('caps', 'Caps')}{th('value', 'Value', 'r')}</tr></thead>
+        <table className="t fixed">
+          <colgroup>{onToggle && <col style={{ width: 62 }} />}<col /><col style={{ width: 98 }} /><col style={{ width: 50 }} /><col style={{ width: 80 }} /><col style={{ width: 70 }} /><col style={{ width: slim ? 196 : 230 }} />{!slim && <col style={{ width: 62 }} />}{!slim && <col style={{ width: 58 }} />}<col style={{ width: 84 }} /><col style={{ width: 62 }} /><col style={{ width: 54 }} /><col style={{ width: 92 }} /></colgroup>
+          <thead><tr>{onToggle && <th />}{th('name', 'Player', '')}<th>Pos</th>{th('age', 'Age')}{th('ovr', 'Ovr')}{th('pot', 'Pot')}<th>Club</th>{!slim && th('mins', 'Mins')}{!slim && th('goals', 'G/A')}<th className="c">Last 5</th>{th('form', 'Form')}{th('caps', 'Caps')}{th('value', 'Value', 'r')}</tr></thead>
           <tbody>
-            {padTop > 0 && <tr><td colSpan={13} style={{ height: padTop, padding: 0, border: 0 }} /></tr>}
+            {padTop > 0 && <tr><td colSpan={cols} style={{ height: padTop, padding: 0, border: 0 }} /></tr>}
             {items.map((vi) => {
               const p = rows[vi.index]
               const c = clubOf(w, p)
@@ -78,13 +82,13 @@ export function PoolTable({ level, selected, onToggle, height = 640, limit }: { 
                   <td><PlayerLink p={p} sub={p.injury ? <span style={{ color: '#fca5a5' }}>Injured · {p.injury.name}</span> : p.iranStatus && p.iranStatus !== 'committed' ? `Eligible · ${p.iranStatus}` : undefined} /></td>
                   <td><span className="row" style={{ gap: 4 }}>{p.pos.slice(0, 2).map((x) => <PosTag key={x} pos={x} />)}</span></td>
                   <td className="c num">{ageOf(w, p)}</td><td className="c"><Ovr p={p} /></td><td className="c"><Ovr p={p} pot /></td>
-                  <td><span className="row" style={{ gap: 8 }}>{c ? <><Crest colors={c.colors} logo={clubLogo(c)} /><span className="col" style={{ gap: 1 }}><span className="truncate" style={{ maxWidth: 170 }}>{c.name}</span><span className="faint row" style={{ fontSize: 11.5, gap: 5 }}><Flag code={c.country} sm />{lg?.name}</span></span></> : <span className="faint">Free agent</span>}</span></td>
-                  <td className="c num">{p.club.mins || '–'}</td><td className="c num">{p.club.goals}/{p.club.assists}</td><td className="c"><FormDots form={p.form} /></td><td className="c"><Rating v={p.form.length ? formAvg(p) : null} /></td>
+                  <td><span className="row" style={{ gap: 8 }}>{c ? <><Crest colors={c.colors} logo={clubLogo(c)} /><span className="col" style={{ gap: 1, minWidth: 0 }}><span className="truncate">{c.name}</span><span className="faint row truncate" style={{ fontSize: 11.5, gap: 5 }}><Flag code={c.country} sm />{lg?.name}</span></span></> : <span className="faint">Free agent</span>}</span></td>
+                  {!slim && <td className="c num">{p.club.mins || '–'}</td>}{!slim && <td className="c num">{p.club.goals}/{p.club.assists}</td>}<td className="c"><FormDots form={p.form} /></td><td className="c"><Rating v={p.form.length ? formAvg(p) : null} /></td>
                   <td className="c num">{p.caps || '–'}</td><td className="r num">{money(p.value)}</td>
                 </tr>
               )
             })}
-            {padBot > 0 && <tr><td colSpan={13} style={{ height: padBot, padding: 0, border: 0 }} /></tr>}
+            {padBot > 0 && <tr><td colSpan={cols} style={{ height: padBot, padding: 0, border: 0 }} /></tr>}
           </tbody>
         </table>
       </div>
