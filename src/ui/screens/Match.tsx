@@ -328,7 +328,7 @@ export function MatchCentre({ fixtureId }: { fixtureId: number }) {
           <div className="scrim" onClick={() => setPanel(false)} />
           <aside className="drawer" style={{ padding: 24 }}>
             <div className="row" style={{ marginBottom: 16 }}><h2>Touchline</h2><span className="muted">{snap.subsLeft[side]} substitutions left · the match is paused</span><button className="btn primary right" onClick={() => setPanel(false)}>Back to the match</button></div>
-            <TacticsEditor compact tactic={snap.tactics[side]} squad={squad} energy={Object.fromEntries(snap.players[side].map((p, i) => [p.id, snap.energy[side][i]]))} locked={new Set(snap.players[side].filter((p) => p.played && !p.on).map((p) => p.id))} onChange={(t) => void applyTactic(t)} />
+            <TacticsEditor compact ratings={Object.fromEntries(snap.players[side].filter((p) => p.on).map((p) => [p.id, p.rating]))} tactic={snap.tactics[side]} squad={squad} energy={Object.fromEntries(snap.players[side].map((p, i) => [p.id, snap.energy[side][i]]))} locked={new Set(snap.players[side].filter((p) => p.played && !p.on).map((p) => p.id))} onChange={(t) => void applyTactic(t)} />
           </aside>
         </>
       )}

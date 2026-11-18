@@ -443,3 +443,9 @@ h1 { font-size: 36px; font-weight: 720; } h2 { font-size: 22px; } h3 { font-size
 .pcard .bar { left: 0; right: 0; bottom: 0; height: 3px; border-radius: 0; background: rgba(255,255,255,0.08); }
 .pcard .bar i { border-radius: 0; }
 .board { aspect-ratio: 1 / 1.2; }
+
+/* live match rating on a pitch card */
+.pcard .mr { position: absolute; left: 3px; top: 3px; z-index: 1; min-width: 26px; padding: 1px 4px; border-radius: 5px; font-size: 11.5px; font-weight: 800; color: #fff; text-align: center; font-variant-numeric: tabular-nums; box-shadow: 0 2px 6px rgba(0,0,0,0.5); }
+
+.board { aspect-ratio: 1 / 1.38; }
+.drawer { width: min(1180px, 94vw); }

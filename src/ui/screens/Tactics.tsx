@@ -4,7 +4,7 @@ import { defaultRole, FORMATION_KEYS, FORMATIONS, ROLE, rolesFor, SLIDERS, type 
 import { effectiveOverall } from '../../sim/ratings/attributes'
 import type { Player } from '../../sim/world/types'
 import { dynOvr } from '../../sim/ratings/dynamic'
-import { ageOf, Avatar, Face, Ovr, ovrColor, PosTag } from '../bits'
+import { ageOf, Avatar, Face, Ovr, ovrColor, PosTag, ratingColor } from '../bits'
 import { useGame } from '../store'
 
 /** Make sure a tactic has a legal eleven drawn from the squad; fills gaps with the best available. */
@@ -16,10 +16,12 @@ export function normaliseTactic(tac: Tactic, squad: Player[]): Tactic {
   return { ...tac, lineup: xi.lineup, bench: xi.bench, roles: tac.roles.length === 11 ? tac.roles : FORMATIONS[tac.formation].map((s) => defaultRole(s.pos)) }
 }
 
-export function TacticsEditor({ tactic, squad, onChange, energy, locked, compact }: {
+export function TacticsEditor({ tactic, squad, onChange, energy, locked, compact, ratings }: {
   tactic: Tactic; squad: Player[]; onChange: (t: Tactic) => void
   /** Live match: player id → energy, and ids that may not be brought on. */
   energy?: Record<number, number>; locked?: Set<number>; compact?: boolean
+  /** Live match: player id → current match rating, shown on the pitch cards. */
+  ratings?: Record<number, number>
 }) {
   const w = useGame((s) => s.w)!
   const [sel, setSel] = useState<number | null>(null)
@@ -51,7 +53,7 @@ export function TacticsEditor({ tactic, squad, onChange, energy, locked, compact
   }
   const selSlot = sel != null ? slots[sel] : null
   return (
-    <div className="grid" style={{ gridTemplateColumns: compact ? '460px 1fr' : '470px minmax(0,1fr) 270px', alignItems: 'start' }}>
+    <div className="grid" style={{ gridTemplateColumns: compact ? '430px 1fr' : '470px minmax(0,1fr) 270px', alignItems: 'start' }}>
       <div className="col">
         <div className="row"><select className="input grow" value={tactic.formation} onChange={(e) => changeFormation(e.target.value)}>{FORMATION_KEYS.map((f) => <option key={f}>{f}</option>)}</select></div>
         {!energy && tired.length > 0 && <div className="pill amber" style={{ height: 'auto', padding: '7px 11px', whiteSpace: 'normal', borderRadius: 10, lineHeight: 1.35 }}>{tired.length} starter{tired.length === 1 ? ' is' : 's are'} not fully recovered ({tired.slice(0, 4).map((x) => `${x.name.split(' ').slice(-1)[0]} ${Math.round(x.cond)}%`).join(', ')}). Tired players fade late in matches and get injured more easily.</div>}
@@ -64,10 +66,11 @@ export function TacticsEditor({ tactic, squad, onChange, energy, locked, compact
             const eff = p ? effectiveOverall(p.attrs, p.pos, s.pos) + dynOvr(p).total : 0
             const e = p ? (energy ? energy[p.id] : p.cond) : undefined
             return (
-              <div key={i} className={`slot ${sel === i ? 'sel' : ''}`} style={{ left: `${9 + s.y * 82}%`, top: `${s.pos === 'GK' ? 88.5 : 83 - s.x * 94}%` }} onClick={() => clickSlot(i)}>
+              <div key={i} className={`slot ${sel === i ? 'sel' : ''}`} style={{ left: `${9 + s.y * 82}%`, top: `${s.pos === 'GK' ? 91 : 73 - ((s.x - 0.17) / 0.61) * 60}%` }} onClick={() => clickSlot(i)}>
                 <div className="pcard">
                   <div className="f">{p && <Face p={p} />}</div>
                   <span className="o" style={{ color: p ? ovrColor(eff) : '#fff' }}>{p ? eff : '+'}</span>
+                  {p && ratings?.[p.id] != null && <span className="mr" style={{ background: ratingColor(ratings[p.id]) }}>{ratings[p.id].toFixed(1)}</span>}
                   <div className="ft"><span>{s.pos}{tactic.captain === p?.id ? ' · C' : ''}</span>{p && <em>{ageOf(w, p)}</em>}</div>
                   {e != null && <div className="bar"><i style={{ width: `${e}%`, background: e > 78 ? '#3ddc97' : e > 60 ? '#f2c46d' : '#e85d65' }} /></div>}
                 </div>
