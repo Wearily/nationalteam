@@ -119,6 +119,12 @@ export function PlayerProfile({ id }: { id: number }) {
             <div className="kv"><span>Status</span><b>{p.real ? 'Real player' : 'Generated'}</b></div>
           </div>
           {!v.exact && <div className="card" style={{ marginTop: 24 }}><b>Ratings are estimates</b><div className="muted" style={{ fontSize: 13.5, margin: '3px 0 10px' }}>Your scouts do not know this player well yet, so overall and potential are shown as ranges. Assign a scout to his region under Recruitment, or call him up: a camp and minutes on the pitch reveal a player quickly.</div><Meter v={p.known} tone="amber" /></div>}
+          {p.intlRetired && !p.retired && (
+            <div className="card row" style={{ marginTop: 24, gap: 18 }}>
+              <div className="grow"><h3>Retired from international football</h3><div className="muted" style={{ fontSize: 13.5, marginTop: 3 }}>He cannot be called up unless he changes his mind. A major tournament ahead, a strong bond with the national team and still being good enough all make a return more likely; age works against it. He will only consider it once every six months.</div></div>
+              <button className="btn primary" onClick={() => void cmd<string>('askReturn', p.id).then(notify)}>Ask him to return</button>
+            </div>
+          )}
           {dual && (
             <div className="card col" style={{ marginTop: 24 }}>
               <div className="row"><h3>Ask him to represent Iran</h3><span className="muted right">Interest: {v.attrs ? ((p.willingness ?? 40) > 60 ? 'warm' : (p.willingness ?? 40) > 35 ? 'open' : 'cool') : 'unknown'}</span></div>

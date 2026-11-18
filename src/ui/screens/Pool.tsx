@@ -77,9 +77,9 @@ export function PoolTable({ level, selected, onToggle, height = 640, limit }: { 
               const lg = leagueOf(w, p)
               const sel = selected?.has(p.id)
               return (
-                <tr key={p.id} className={`click ${sel ? 'sel' : ''}`} onClick={() => open(p.id)} style={{ height: 45 }}>
-                  {onToggle && <td><button className={`btn sm ${sel ? 'green' : ''}`} style={{ width: 28, padding: 0 }} onClick={(e) => { e.stopPropagation(); onToggle(p) }}>{sel ? <Check /> : <Plus />}</button></td>}
-                  <td><PlayerLink p={p} sub={p.injury ? <span style={{ color: '#fca5a5' }}>Injured · {p.injury.name}</span> : p.iranStatus && p.iranStatus !== 'committed' ? `Eligible · ${p.iranStatus}` : undefined} /></td>
+                <tr key={p.id} className={`click ${sel ? 'sel' : ''}`} onClick={() => open(p.id)} style={{ height: 45, opacity: p.intlRetired ? 0.6 : 1 }}>
+                  {onToggle && <td><button className={`btn sm ${sel ? 'green' : ''}`} style={{ width: 28, padding: 0 }} disabled={!!p.intlRetired && !sel} title={p.intlRetired ? 'Retired from international football. Open his profile to ask him to return.' : undefined} onClick={(e) => { e.stopPropagation(); onToggle(p) }}>{sel ? <Check /> : <Plus />}</button></td>}
+                  <td><PlayerLink p={p} sub={p.intlRetired ? <span style={{ color: '#f2c46d' }}>Retired from international football</span> : p.injury ? <span style={{ color: '#fca5a5' }}>Injured · {p.injury.name}</span> : p.iranStatus && p.iranStatus !== 'committed' ? `Eligible · ${p.iranStatus}` : undefined} /></td>
                   <td><span className="row" style={{ gap: 4 }}>{p.pos.slice(0, 2).map((x) => <PosTag key={x} pos={x} />)}</span></td>
                   <td className="c num">{ageOf(w, p)}</td><td className="c"><Ovr p={p} /></td><td className="c"><Ovr p={p} pot /></td>
                   <td><span className="row" style={{ gap: 8 }}>{c ? <><Crest colors={c.colors} logo={clubLogo(c)} /><span className="col" style={{ gap: 1, minWidth: 0 }}><span className="truncate">{c.name}</span><span className="faint row truncate" style={{ fontSize: 11.5, gap: 5 }}><Flag code={c.country} sm />{lg?.name}</span></span></> : <span className="faint">Free agent</span>}</span></td>
