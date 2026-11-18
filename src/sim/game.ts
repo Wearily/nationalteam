@@ -362,7 +362,7 @@ export class Game {
     // a major tournament on the horizon, a strong bond with the shirt and still being good enough all help
     const tournament = w.comps.some((c) => c.scope === 'nat' && c.level === 'senior' && !c.friendly && !c.done && c.weight >= 35)
     const stillGood = p.ovr >= w.nations.IRN.level - 5
-    const will = 22 + (p.traits.attachment - 10) * 3 + (tournament ? 18 : 0) + (stillGood ? 12 : -10) - Math.max(0, age - 34) * 9 + (w.fed.fans - 50) * 0.15
+    const will = 8 + (p.traits.attachment - 10) * 3 + (tournament ? 15 : 0) + (stillGood ? 12 : -10) - Math.max(0, age - 34) * 9 + (w.fed.fans - 50) * 0.15
     if (this.rng.range(0, 100) < will) {
       p.intlRetired = false
       p.morale = clamp(p.morale + 10, 0, 100)
