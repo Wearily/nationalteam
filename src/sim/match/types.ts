@@ -106,6 +106,8 @@ export interface PStats {
   heat: number[]
   on: boolean
   played: boolean
+  /** Position played (the slot he started in or came on into). */
+  pos?: Pos
   subOn?: number
   subOff?: number
 }

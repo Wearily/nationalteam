@@ -94,8 +94,8 @@ export class MatchSim {
       const team = this.teams[t]
       this.on[t] = team.tactic.lineup.map((id) => team.players.findIndex((p) => p.id === id))
       this.applyTactic(t)
-      this.on[t].forEach((pi) => {
-        if (pi >= 0) { this.ps[t][pi].on = true; this.ps[t][pi].played = true }
+      this.on[t].forEach((pi, slot) => {
+        if (pi >= 0) { this.ps[t][pi].on = true; this.ps[t][pi].played = true; this.ps[t][pi].pos = this.slots[t][slot].pos }
       })
       // each player has a slightly good or bad day, driven by consistency, form and occasion
       this.dayBoost[t] = team.players.map((p) => {
@@ -1010,6 +1010,7 @@ export class MatchSim {
     this.ps[t][benchIdx].on = true
     this.ps[t][benchIdx].played = true
     this.ps[t][benchIdx].subOn = min
+    this.ps[t][benchIdx].pos = this.slots[t][s].pos
     this.subsUsed[t]++
     this.mustSub[t] = this.mustSub[t].filter((id) => id !== out.id)
     this.ev('sub', t, `Substitution for ${this.teams[t].short}: ${inn.short} replaces ${out.short}.`, { p: inn.id, q: out.id })
