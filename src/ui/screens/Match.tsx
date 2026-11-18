@@ -1,7 +1,7 @@
 import { FastForward, Pause, Play, Settings2 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { LiveChunk } from '../../sim/game'
-import { teamName } from '../../sim/intl/select'
+import { pickXI, teamName } from '../../sim/intl/select'
 import type { Tactic } from '../../sim/match/tactics'
 import type { Frame, MatchSnapshot, MEvent, PStats, ShotRec, TStats } from '../../sim/match/types'
 import { LEVEL_NAME, type Level } from '../../sim/world/types'
@@ -245,6 +245,8 @@ export function MatchCentre({ fixtureId }: { fixtureId: number }) {
   const [speed, setSpeed] = useState(18)
   const [tab, setTab] = useState<'feed' | 'stats' | 'players' | 'shots'>('feed')
   const [panel, setPanel] = useState(false)
+  const [coachOn, setCoachOn] = useState(false)
+  const coach = team.coachId != null ? world.staff[team.coachId] : null
   const frames = useRef<Frame[]>([])
   const clock = useRef(0)
   const nums = useRef<string[]>([])
@@ -268,6 +270,7 @@ export function MatchCentre({ fixtureId }: { fixtureId: number }) {
     const c = await sim.liveStart(fixtureId)
     if (typeof c === 'string') return notify(c)
     absorb(c)
+    if (coachOn) setSnap(await sim.liveCoach(true))
     setPhase('live')
   }
 
@@ -344,6 +347,12 @@ export function MatchCentre({ fixtureId }: { fixtureId: number }) {
             <span className="muted">Opponent strength</span><OvrNum v={opp?.level ?? 60} /><span className="muted">· {LEVEL_NAME[level]} team · {comp.subs} substitutions</span>
             <button className="btn primary go" disabled={squad.length < 11} onClick={() => void kickOff()}><Play />Kick off</button>
           </div>
+          <div className="row" style={{ justifyContent: 'center', gap: 12, paddingBottom: 10 }}>
+            <span className="muted">On the touchline</span>
+            <div className="seg"><button className={!coachOn ? 'on' : ''} onClick={() => setCoachOn(false)}>You manage the match</button><button className={coachOn ? 'on' : ''} onClick={() => setCoachOn(true)}>{coach ? `${coach.name} manages` : 'Coach manages'}</button></div>
+            <button className="btn" onClick={() => { const xi = pickXI(squad, tactic.formation); setTactic({ ...tactic, lineup: xi.lineup, bench: xi.bench }) }}>Coach's eleven</button>
+            <span className="faint" style={{ fontSize: 12.5 }}>{coachOn ? 'He makes the substitutions and adjustments; you can take over at any time.' : 'You make the substitutions and changes.'}</span>
+          </div>
         </div>
         {squad.length >= 11 ? <TacticsEditor tactic={tactic} squad={squad} onChange={setTactic} /> : <div className="card"><Empty>You need to name a squad before this match can be played.</Empty></div>}
       </div>
@@ -368,7 +377,8 @@ export function MatchCentre({ fixtureId }: { fixtureId: number }) {
           {live ? <>
             <button className="btn" onClick={() => setPlaying((p) => !p)}>{playing ? <><Pause />Pause</> : <><Play />Resume</>}</button>
             <div className="seg">{SPEEDS.map(([n, v]) => <button key={n} className={speed === v ? 'on' : ''} onClick={() => setSpeed(v)}>{n}</button>)}</div>
-            <button className="btn" onClick={() => setPanel(true)}><Settings2 />Tactics and substitutions <span className="pill">{snap.subsLeft[side]} left</span></button>
+            <button className="btn" disabled={coachOn} onClick={() => setPanel(true)}><Settings2 />Tactics and substitutions <span className="pill">{snap.subsLeft[side]} left</span></button>
+            <div className="seg" title="Who makes substitutions and in-game adjustments"><button className={!coachOn ? 'on' : ''} onClick={() => { setCoachOn(false); void sim.liveCoach(false).then(setSnap) }}>You</button><button className={coachOn ? 'on' : ''} onClick={() => { setCoachOn(true); void sim.liveCoach(true).then(setSnap) }}>{coach ? coach.name.split(' ').slice(-1)[0] : 'Coach'} in charge</button></div>
             <button className="btn ghost right" onClick={() => void finish()}><FastForward />Instant result</button>
           </> : <button className="btn primary go right" onClick={() => void finish()}>Continue to report</button>}
         </div>

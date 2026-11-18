@@ -562,6 +562,8 @@ export class Game {
     L.sentShots = L.sim.shots.length
     return chunk
   }
+  /** Let the head coach run the match from the touchline (or take charge again). */
+  liveCoach(on: boolean) { this.live!.sim.setAi(this.live!.side, on); return this.live!.sim.snapshot() }
   liveSub(outId: number, inId: number): string | null { return this.live!.sim.substitute(this.live!.side, outId, inId) }
   liveTactic(tac: Tactic) { this.live!.sim.setTactic(this.live!.side, tac) }
   liveFinish(): number {

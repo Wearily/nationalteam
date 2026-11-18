@@ -31,6 +31,7 @@ const api = {
   },
   liveStart(fixtureId: number) { return game!.liveStart(fixtureId) },
   liveStep(n: number) { return game!.liveStep(n) },
+  liveCoach(on: boolean) { return game!.liveCoach(on) },
   liveSub(outId: number, inId: number) { return game!.liveSub(outId, inId) },
   liveTactic(tac: Parameters<Game['liveTactic']>[0]) { game!.liveTactic(tac); return true },
   liveFinish() { const report = game!.liveFinish(); return { report, w: game!.w } },

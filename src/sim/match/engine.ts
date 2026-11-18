@@ -35,6 +35,9 @@ const threat = (nx: number, ny: number) => {
   return 0.42 * Math.exp(-Math.sqrt(dx * dx + dy * dy) / 11) + 0.012 * nx
 }
 
+/** Minutes at which a coach reviews substitutions and approach. */
+const SUB_MARKS = [58, 68, 76, 84, 96, 106]
+
 type Restart = 'kickoff' | 'goalkick' | 'corner' | 'freekick' | 'throw' | 'penalty' | null
 
 export class MatchSim {
@@ -1048,7 +1051,7 @@ export class MatchSim {
       const team = this.teams[t]
       if (!team.ai) continue
       const o = (1 - t) as 0 | 1
-      const marks = [58, 68, 76, 84, 96, 106]
+      const marks = SUB_MARKS
       if (this.aiSubMarks[t] < marks.length && min >= marks[this.aiSubMarks[t]] && !this.restart) {
         this.aiSubMarks[t]++
         if (this.subsUsed[t] < this.opts.subs) {
@@ -1071,6 +1074,18 @@ export class MatchSim {
     }
   }
   needsSub(t: 0 | 1) { return this.mustSub[t] }
+  /** Hand a side to its coach (substitutions and in-game adjustments) or take it back. */
+  setAi(t: 0 | 1, on: boolean) {
+    this.teams[t].ai = on
+    if (!on) return
+    const { min } = this.minute()
+    // do not replay review points that have already gone by
+    while (this.aiSubMarks[t] < SUB_MARKS.length && SUB_MARKS[this.aiSubMarks[t]] < min - 4) this.aiSubMarks[t]++
+    for (const id of [...this.mustSub[t]]) {
+      const s = this.on[t].findIndex((i) => i >= 0 && this.teams[t].players[i].id === id)
+      if (s >= 0) this.forceSub(t, s)
+    }
+  }
 
   snapshot(): MatchSnapshot {
     const tot = this.possTime[0] + this.possTime[1] || 1
