@@ -7,7 +7,7 @@ import type { World } from '../sim/world/state'
 import type { Pos } from '../sim/world/types'
 
 let game: Game | null = null
-const CMDS = new Set(['announceSquad', 'assignScout', 'hireCoach', 'approach', 'setControl', 'setTactic', 'setBudget', 'markRead', 'markAllRead', 'askReturn', 'suggestSquad', 'arrangeFriendly', 'bookFriendly', 'cancelFriendly'])
+const CMDS = new Set(['announceSquad', 'assignScout', 'hireCoach', 'approach', 'setControl', 'setTactic', 'setBudget', 'markRead', 'markAllRead', 'lastSquadFor', 'askReturn', 'suggestSquad', 'arrangeFriendly', 'bookFriendly', 'cancelFriendly'])
 
 const api = {
   newGame(raw: RawData, seed: number, name: string, extra?: RawExtra | null): World {
@@ -17,6 +17,7 @@ const api = {
   load(w: World, extra?: RawExtra | null) {
     game = new Game(w)
     game.applyPositionFixes(extra, positions as unknown as Record<string, Pos[] | string>)
+    game.restoreTournamentSquads()
     return game.w
   },
   advance(days: number) {

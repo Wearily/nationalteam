@@ -144,6 +144,33 @@ export class Game {
     for (const t of Object.values(this.w.teams)) if (t.level !== level) for (const id of t.squad) taken.add(id)
     return pickSquad(this.w, this.idx, this.rng, 'IRN', level, size, this.w.day, coach?.abroadBias ?? 0, taken)
   }
+  /** The previous squad for this team, minus anyone who can no longer be picked (retired, too old for the age group, long-term injured). */
+  lastSquadFor(level: Level): { ids: number[]; dropped: string[] } {
+    const w = this.w
+    const team = w.teams[level]
+    let prev = team.lastSquad ?? []
+    if (!prev.length) {
+      // careers from before squads were remembered: use the players from the team's most recent match
+      const ref = natRef('IRN', level)
+      const f = [...w.fixtures].reverse().find((x) => x.played && x.report != null && (x.home === ref || x.away === ref))
+      const rep = f ? w.reports.find((r) => r.id === f.report) : null
+      if (rep && f) prev = rep.players[f.home === ref ? 0 : 1].map((st) => st.id)
+    }
+    const camp = this.activeCamp(level)
+    const ok = new Set(eligible(w, this.idx, 'IRN', level, w.day).map((p) => p.id))
+    const taken = new Set<number>()
+    for (const t of Object.values(w.teams)) if (t.level !== level) for (const id of t.squad) taken.add(id)
+    const ids: number[] = []
+    const dropped: string[] = []
+    for (const id of prev) {
+      const p = w.players[id]
+      if (!p) continue
+      const why = !ok.has(id) ? (p.intlRetired ? 'retired from internationals' : p.retired ? 'retired' : 'no longer eligible') : p.injury && p.injury.until > (camp?.first ?? w.day) + 10 ? 'injured' : taken.has(id) ? 'with another Iran squad' : null
+      if (why) dropped.push(`${p.name} (${why})`)
+      else ids.push(id)
+    }
+    return { ids: ids.slice(0, camp?.size ?? 26), dropped }
+  }
   validateSquad(level: Level, ids: number[], camp: Camp): string | null {
     if (ids.length > camp.size) return `Too many players: ${ids.length} selected, the limit is ${camp.size}.`
     if (ids.length < 18) return 'Select at least 18 players.'
@@ -164,6 +191,7 @@ export class Game {
     if (err) return err
     const team = w.teams[level]
     team.squad = [...ids]
+    team.lastSquad = [...ids]
     camp.announced = true
     // time in camp with the coaches tells you a lot about a player
     for (const id of ids) { const pl = w.players[id]; pl.known = Math.min(100, Math.max(pl.known + 20, 65)) }
@@ -652,9 +680,48 @@ export class Game {
       if (c.done || !c.announced || c.to > w.day) continue
       const ref = natRef('IRN', c.level)
       if (w.fixtures.some((f) => !f.played && (f.home === ref || f.away === ref) && f.day <= c.to + 1)) continue
+      // a tournament squad is registered for the whole competition: it stays together between rounds
+      // (knockout fixtures do not exist until the previous round finishes) until Iran are out or it ends
+      if (this.inTournament(c)) continue
       c.done = true
       this.campEffects(c)
       if (!w.camps.some((x) => x !== c && !x.done && x.level === c.level && x.announced)) w.teams[c.level].squad = []
+    }
+  }
+
+  /** True while Iran are still alive in the centrally-hosted tournament this camp was called for. */
+  private inTournament(c: Camp): boolean {
+    const comp = this.w.comps[c.compId]
+    if (!comp || comp.friendly || comp.done) return false
+    const st0 = comp.stages[0]
+    if (!st0.neutral) return false // home-and-away qualifying is played window by window, not as one camp
+    return !comp.placings?.[natRef('IRN', c.level)]
+  }
+  /**
+   * Repair for careers saved before tournament squads were kept between rounds: if a squad is being asked
+   * for again in a tournament Iran have already played in, restore the registered squad instead (everyone
+   * who appeared, topped up with the coach's choices).
+   */
+  restoreTournamentSquads() {
+    const w = this.w
+    for (const c of w.camps) {
+      if (c.done || c.announced) continue
+      const comp = w.comps[c.compId]
+      if (!comp || comp.friendly || comp.done || !comp.stages[0].neutral) continue
+      const ref = natRef('IRN', c.level)
+      const ids = new Set<number>()
+      for (const f of w.fixtures) {
+        if (f.compId !== comp.id || !f.played || (f.home !== ref && f.away !== ref) || f.report == null) continue
+        const rep = w.reports.find((r) => r.id === f.report)
+        const side = rep ? rep.players[f.home === ref ? 0 : 1] : []
+        for (const st of side) if (w.players[st.id] && !w.players[st.id].retired) ids.add(st.id)
+      }
+      if (ids.size < 11) continue
+      const team = w.teams[c.level]
+      for (const id of this.suggestSquad(c.level, c.size)) { if (ids.size >= c.size) break; ids.add(id) }
+      team.squad = [...ids]
+      c.announced = true
+      this.msg('squad', `${LEVEL_NAME[c.level]} squad stays together`, `The ${comp.name} squad remains registered for the rest of the tournament. No new selection is needed between rounds.`, false, `team:${c.level}`)
     }
   }
 

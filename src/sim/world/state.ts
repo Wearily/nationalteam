@@ -25,6 +25,8 @@ export interface IranTeam {
   squad: number[]
   /** Depth-chart shortlist kept between windows. */
   shortlist: number[]
+  /** The most recently announced squad, for "same again" call-ups. */
+  lastSquad?: number[]
 }
 
 export interface Federation {
