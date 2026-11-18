@@ -4,7 +4,7 @@ import { defaultRole, FORMATION_KEYS, FORMATIONS, ROLE, rolesFor, SLIDERS, type 
 import { effectiveOverall } from '../../sim/ratings/attributes'
 import type { Player } from '../../sim/world/types'
 import { dynOvr } from '../../sim/ratings/dynamic'
-import { Avatar, Face, Ovr, ovrColor, PosTag } from '../bits'
+import { ageOf, Avatar, Face, Ovr, ovrColor, PosTag } from '../bits'
 import { useGame } from '../store'
 
 /** Make sure a tactic has a legal eleven drawn from the squad; fills gaps with the best available. */
@@ -51,7 +51,7 @@ export function TacticsEditor({ tactic, squad, onChange, energy, locked, compact
   }
   const selSlot = sel != null ? slots[sel] : null
   return (
-    <div className="grid" style={{ gridTemplateColumns: compact ? '460px 1fr' : '500px minmax(0,1fr) 300px', alignItems: 'start' }}>
+    <div className="grid" style={{ gridTemplateColumns: compact ? '460px 1fr' : '470px minmax(0,1fr) 270px', alignItems: 'start' }}>
       <div className="col">
         <div className="row"><select className="input grow" value={tactic.formation} onChange={(e) => changeFormation(e.target.value)}>{FORMATION_KEYS.map((f) => <option key={f}>{f}</option>)}</select></div>
         {!energy && tired.length > 0 && <div className="pill amber" style={{ height: 'auto', padding: '7px 11px', whiteSpace: 'normal', borderRadius: 10, lineHeight: 1.35 }}>{tired.length} starter{tired.length === 1 ? ' is' : 's are'} not fully recovered ({tired.slice(0, 4).map((x) => `${x.name.split(' ').slice(-1)[0]} ${Math.round(x.cond)}%`).join(', ')}). Tired players fade late in matches and get injured more easily.</div>}
@@ -64,12 +64,12 @@ export function TacticsEditor({ tactic, squad, onChange, energy, locked, compact
             const eff = p ? effectiveOverall(p.attrs, p.pos, s.pos) + dynOvr(p).total : 0
             const e = p ? (energy ? energy[p.id] : p.cond) : undefined
             return (
-              <div key={i} className={`slot ${sel === i ? 'sel' : ''}`} style={{ left: `${9 + s.y * 82}%`, top: `${90 - s.x * 100}%` }} onClick={() => clickSlot(i)}>
+              <div key={i} className={`slot ${sel === i ? 'sel' : ''}`} style={{ left: `${9 + s.y * 82}%`, top: `${s.pos === 'GK' ? 88.5 : 83 - s.x * 94}%` }} onClick={() => clickSlot(i)}>
                 <div className="pcard">
-                  {p && <div className="f"><Face p={p} /></div>}
+                  <div className="f">{p && <Face p={p} />}</div>
                   <span className="o" style={{ color: p ? ovrColor(eff) : '#fff' }}>{p ? eff : '+'}</span>
-                  {e != null && <div className="bar"><i style={{ width: `${e}%`, background: e > 70 ? '#3ddc97' : e > 55 ? '#f2c46d' : '#e85d65' }} /></div>}
-                  <span className="p">{s.pos}{tactic.captain === p?.id ? ' · C' : ''}</span>
+                  <div className="ft"><span>{s.pos}{tactic.captain === p?.id ? ' · C' : ''}</span>{p && <em>{ageOf(w, p)}</em>}</div>
+                  {e != null && <div className="bar"><i style={{ width: `${e}%`, background: e > 78 ? '#3ddc97' : e > 60 ? '#f2c46d' : '#e85d65' }} /></div>}
                 </div>
                 <span className="nm">{p ? p.name.split(' ').slice(-1)[0] : s.pos}</span>
               </div>
@@ -87,15 +87,15 @@ export function TacticsEditor({ tactic, squad, onChange, energy, locked, compact
       </div>
       <div className="card flush scroll" style={{ maxHeight: 760 }}>
         <div className="card-head"><h3>{energy ? 'Bench' : 'Squad'}</h3><span className="faint">{sel != null ? 'Pick a player for the highlighted position' : 'Select a position on the pitch first'}</span></div>
-        <table className="t"><thead><tr><th>Player</th><th>Pos</th><th className="c">Ovr</th><th className="c">{selSlot ? `At ${selSlot.pos}` : 'Fit'}</th><th className="c">Cond</th><th className="c">Sharp</th></tr></thead><tbody>
+        <table className="t"><thead><tr><th>Player</th><th>Pos</th><th className="c">Age</th><th className="c">Ovr</th><th className="c">Pot</th>{selSlot && <th className="c">At {selSlot.pos}</th>}<th className="c">Cond</th><th className="c">Sharp</th></tr></thead><tbody>
           {bench.sort((a, b) => (selSlot ? effectiveOverall(b.attrs, b.pos, selSlot.pos) - effectiveOverall(a.attrs, a.pos, selSlot.pos) : b.ovr - a.ovr)).map((p) => {
             const dis = locked?.has(p.id) || !!p.injury
             return (
               <tr key={p.id} className={sel != null && !dis ? 'click' : ''} style={{ opacity: dis ? 0.38 : 1 }} onClick={() => clickBench(p)}>
                 <td><span className="row" style={{ gap: 9 }}><Avatar p={p} size={26} /><span style={{ fontWeight: 560 }}>{p.name}</span>{p.injury && <span className="pill red">Inj</span>}{locked?.has(p.id) && <span className="pill">Used</span>}</span></td>
                 <td><span className="row" style={{ gap: 4 }}>{p.pos.slice(0, 2).map((x) => <PosTag key={x} pos={x} />)}</span></td>
-                <td className="c"><Ovr p={p} /></td>
-                <td className="c num">{selSlot ? effectiveOverall(p.attrs, p.pos, selSlot.pos) : '–'}</td>
+                <td className="c num">{ageOf(w, p)}</td><td className="c"><Ovr p={p} /></td><td className="c"><Ovr p={p} pot /></td>
+                {selSlot && <td className="c num"><b>{effectiveOverall(p.attrs, p.pos, selSlot.pos) + dynOvr(p).total}</b></td>}
                 <td className="c num" style={{ color: p.cond < 65 ? '#ff7a82' : p.cond < 82 ? '#f2c46d' : undefined, fontWeight: p.cond < 82 ? 700 : undefined }}>{Math.round(p.cond)}%</td><td className="c num">{Math.round(p.sharp)}%</td>
               </tr>
             )
