@@ -12,7 +12,7 @@ type SortKey = 'ovr' | 'pot' | 'age' | 'form' | 'value' | 'caps' | 'name' | 'goa
 const WHERE = [['all', 'Anywhere'], ['iran', 'In Iran'], ['abroad', 'Abroad'], ['europe', 'Europe'], ['gulf', 'Gulf & Asia']] as const
 
 /** Sortable, filterable list of everyone eligible (or potentially eligible) for Iran. */
-export function PoolTable({ level, selected, onToggle, height = 640, limit }: { level?: Level; selected?: Set<number>; onToggle?: (p: Player) => void; height?: number | string; limit?: number }) {
+export function PoolTable({ level, selected, onToggle, height = 640, limit, overage = 0 }: { level?: Level; selected?: Set<number>; onToggle?: (p: Player) => void; height?: number | string; limit?: number; /** Over-age players allowed in the squad being named. */ overage?: number }) {
   const w = useGame((s) => s.w)!
   const open = useGame((s) => s.openPlayer)
   const [q, setQ] = useState('')
@@ -22,13 +22,15 @@ export function PoolTable({ level, selected, onToggle, height = 640, limit }: { 
   const [status, setStatus] = useState<'committed' | 'dual'>('committed')
   const [sort, setSort] = useState<[SortKey, number]>(['ovr', -1])
   const lvl = level ?? lv
+  const [older, setOlder] = useState(false)
+  const showOlder = overage > 0 && older
   const rows = useMemo(() => {
     const ql = q.trim().toLowerCase()
     const out = w.players.filter((p) => {
       if (p.retired) return false
       if (status === 'dual' ? !(p.iranStatus && p.iranStatus !== 'committed') : p.nat[0] !== 'IRN') return false
       if (p.known < 8) return false
-      if (!ageEligible(p, lvl, w.day)) return false
+      if (showOlder ? ageEligible(p, lvl, w.day) : !ageEligible(p, lvl, w.day)) return false
       if (line !== 'ALL' && posLine(p.pos[0]) !== line) return false
       if (ql && !p.name.toLowerCase().includes(ql) && !(clubOf(w, p)?.name.toLowerCase().includes(ql))) return false
       if (where !== 'all') {
@@ -45,7 +47,7 @@ export function PoolTable({ level, selected, onToggle, height = 640, limit }: { 
     const val = (p: Player): number | string => k === 'ovr' ? (scoutView(p).lo + scoutView(p).hi) / 2 : k === 'pot' ? (scoutView(p).potLo + scoutView(p).potHi) / 2 : k === 'age' ? -p.dob : k === 'form' ? (p.form.length ? formAvg(p) : 0) : k === 'value' ? p.value : k === 'caps' ? p.caps : k === 'goals' ? p.club.goals : k === 'mins' ? p.club.mins : p.name
     out.sort((a, b) => { const x = val(a); const y = val(b); return (x < y ? -1 : x > y ? 1 : 0) * dir })
     return limit ? out.slice(0, limit) : out
-  }, [w, q, line, where, lvl, sort, status, limit])
+  }, [w, q, line, where, lvl, sort, status, limit, showOlder])
   const parent = useRef<HTMLDivElement>(null)
   const virt = useVirtualizer({ count: rows.length, getScrollElement: () => parent.current, estimateSize: () => 45, overscan: 14 })
   const th = (k: SortKey, label: string, cls = 'c') => <th className={`${cls} sort`} onClick={() => setSort(([ck, d]) => (ck === k ? [k, -d] : [k, k === 'name' ? 1 : -1]))}>{label}{sort[0] === k ? (sort[1] < 0 ? ' ↓' : ' ↑') : ''}</th>
@@ -61,6 +63,7 @@ export function PoolTable({ level, selected, onToggle, height = 640, limit }: { 
         <div className="row input" style={{ gap: 8, width: 230 }}><Search size={14} className="faint" /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search player or club" style={{ background: 'none', border: 0, outline: 'none', flex: 1, minWidth: 0 }} /></div>
         <div className="seg">{['ALL', 'GK', 'DEF', 'MID', 'ATT'].map((l) => <button key={l} className={line === l ? 'on' : ''} onClick={() => setLine(l)}>{l === 'ALL' ? 'All' : l}</button>)}</div>
         <div className="seg">{WHERE.map(([k, n]) => <button key={k} className={where === k ? 'on' : ''} onClick={() => setWhere(k)}>{n}</button>)}</div>
+        {overage > 0 && <div className="seg"><button className={!older ? 'on' : ''} onClick={() => setOlder(false)}>{LEVEL_NAME[lvl]} age</button><button className={older ? 'on' : ''} onClick={() => setOlder(true)}>Over-age (max {overage})</button></div>}
         {!level && <select className="input" value={lv} onChange={(e) => setLv(e.target.value as Level)}>{LEVELS.map((l) => <option key={l} value={l}>{LEVEL_NAME[l]} eligible</option>)}</select>}
         {!level && <div className="seg"><button className={status === 'committed' ? 'on' : ''} onClick={() => setStatus('committed')}>Iran players</button><button className={status === 'dual' ? 'on' : ''} onClick={() => setStatus('dual')}>Dual nationals</button></div>}
         <span className="faint right num">{rows.length} players</span>

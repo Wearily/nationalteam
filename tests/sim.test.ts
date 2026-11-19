@@ -131,6 +131,13 @@ describe('career', () => {
     const ac = g.w.comps.find((c) => c.key.startsWith('afc-asian-cup'))!
     expect(ac.done).toBe(true)
     expect(ac.winner).toBeTruthy()
+    // the Asian age-group cups feed the world tournaments
+    for (const key of ['fifa-u20:2027', 'fifa-u17:2027']) {
+      const c = g.w.comps.find((x) => x.key === key)!
+      expect(c, key).toBeTruthy()
+      expect(c.done, key).toBe(true)
+      expect(c.winner, key).toBeTruthy()
+    }
     const copy = new Game(JSON.parse(JSON.stringify(g.w)))
     expect(copy.advance(30).days).toBeGreaterThan(0)
   }, 60000)

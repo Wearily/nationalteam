@@ -1,15 +1,15 @@
 import { fmtDay, toDay, ymd, type Day } from './core/date'
 import { Rng, clamp } from './core/rng'
-import { A, fitToOverall, overallAt } from './ratings/attributes'
+import { A, fitToOverall, overallAt, posLine } from './ratings/attributes'
 import { mergeExtra, type RawData, type RawExtra } from './data/raw'
 import { campLift, developAll, matchLift, revalue, reviewPotential, seasonRollover } from './career/develop'
 import { seasonYearFor, simClubFixture, startLeagueSeason } from './clubs/season'
 import { transferWeek } from './clubs/transfers'
 import { progress } from './comps/engine'
 import type { Comp, GroupStage, KoStage } from './comps/types'
-import { addFriendly, ASIAN_CUP_2027, cancelClashingFriendlies, openSlots, planYear, rebuildCamps, scheduleYear, setupAsianCup, setupWorldCup } from './intl/calendar'
+import { addFriendly, ASIAN_CUP_2027, cancelClashingFriendlies, openSlots, planYear, rebuildCamps, scheduleYear, setupAsianCup, setupOlympics, setupWorldCup, setupYouthWorldCup } from './intl/calendar'
 import { applyRanking, rerank } from './intl/ranking'
-import { aiTactic, buildMTeam, eligible, pickSquad, selectionScore, teamName } from './intl/select'
+import { ageEligible, aiTactic, buildMTeam, eligible, pickSquad, selectionScore, teamName } from './intl/select'
 import { MatchSim } from './match/engine'
 import type { Tactic } from './match/tactics'
 import type { Frame, MatchReport, MatchSnapshot, MEvent, ShotRec } from './match/types'
@@ -149,7 +149,28 @@ export class Game {
       const busy = this.w.camps.some((c) => c.level === t.level && c.announced && !c.done && (c.first <= this.w.day || this.inTournament(c)))
       if (older || busy) for (const id of t.squad) taken.add(id)
     }
-    return pickSquad(this.w, this.idx, this.rng, 'IRN', level, size, this.w.day, coach?.abroadBias ?? 0, taken)
+    const ids = pickSquad(this.w, this.idx, this.rng, 'IRN', level, size, this.w.day, coach?.abroadBias ?? 0, taken)
+    // tournaments that allow over-age players: the coach brings the best available seniors where they improve the squad
+    const over = this.overageFor(level)
+    if (over) {
+      const w = this.w
+      const olds = eligible(w, this.idx, 'IRN', 'senior', w.day).filter((p) => !ageEligible(p, level, w.day) && !taken.has(p.id) && !p.injury).sort((a, b) => selectionScore(w, b) - selectionScore(w, a))
+      let n = 0
+      for (const o of olds) {
+        if (n >= over) break
+        const line = posLine(o.pos[0])
+        const same = ids.map((id) => w.players[id]).filter((p) => posLine(p.pos[0]) === line && ageEligible(p, level, w.day)).sort((a, b) => a.ovr - b.ovr)
+        if (!same.length || same[0].ovr >= o.ovr - 2) continue
+        ids[ids.indexOf(same[0].id)] = o.id
+        n++
+      }
+    }
+    return ids
+  }
+  /** Over-age players allowed in the squad now being named for this team (0 for ordinary camps). */
+  overageFor(level: Level): number {
+    const camp = this.activeCamp(level)
+    return camp ? this.w.comps[camp.compId]?.overage ?? 0 : 0
   }
   /** The previous squad for this team, minus anyone who can no longer be picked (retired, too old for the age group, long-term injured). */
   lastSquadFor(level: Level): { ids: number[]; dropped: string[] } {
@@ -164,7 +185,7 @@ export class Game {
       if (rep && f) prev = rep.players[f.home === ref ? 0 : 1].map((st) => st.id)
     }
     const camp = this.activeCamp(level)
-    const ok = new Set(eligible(w, this.idx, 'IRN', level, w.day).map((p) => p.id))
+    const ok = new Set(eligible(w, this.idx, 'IRN', this.overageFor(level) ? 'senior' : level, w.day).map((p) => p.id))
     const taken = new Set<number>()
     for (const t of Object.values(w.teams)) if (t.level !== level) for (const id of t.squad) taken.add(id)
     const ids: number[] = []
@@ -197,9 +218,12 @@ export class Game {
     if (ids.length > camp.size) return `Too many players: ${ids.length} selected, the limit is ${camp.size}.`
     if (ids.length < 18) return 'Select at least 18 players.'
     const el = new Set(eligible(this.w, this.idx, 'IRN', level, this.w.day).map((p) => p.id))
+    const over = this.w.comps[camp.compId]?.overage ?? 0
+    const seniors = over ? new Set(eligible(this.w, this.idx, 'IRN', 'senior', this.w.day).map((p) => p.id)) : null
+    if (seniors && ids.filter((id) => !el.has(id) && seniors.has(id)).length > over) return `Only ${over} over-age players are allowed in this squad.`
     for (const id of ids) {
       const p = this.w.players[id]
-      if (!el.has(id)) return `${p.name} is not eligible for the ${LEVEL_NAME[level]} team.`
+      if (!el.has(id) && !seniors?.has(id)) return `${p.name} is not eligible for the ${LEVEL_NAME[level]} team.`
       if (p.injury && p.injury.until > camp.first + 10) return `${p.name} is injured until ${fmtDay(p.injury.until)}.`
       const other = this.squadOf(id, level)
       if (other && LEVELS.indexOf(other) < LEVELS.indexOf(level)) return `${p.name} is with the ${LEVEL_NAME[other]} squad, which has first call on him.`
@@ -624,15 +648,51 @@ export class Game {
   private closeComp(comp: Comp) {
     const w = this.w
     const iran = natRef('IRN', comp.level)
-    const place = comp.placings?.[iran]
+    let place = comp.placings?.[iran]
+    // the third-place play-off decides third and fourth (bronze at the Olympics and Asian Games)
+    const third = w.fixtures.find((f) => f.compId === comp.id && f.slot === 99 && f.played && (f.home === iran || f.away === iran))
+    if (third && comp.placings) {
+      const won = (third.hg !== third.ag ? third.hg > third.ag : !!third.pens && third.pens[0] > third.pens[1]) === (third.home === iran)
+      const medal = comp.key.startsWith('olympics') || comp.key.startsWith('asian-games')
+      place = comp.placings[iran] = won ? (medal ? 'Bronze medal' : 'Third place') : 'Fourth place'
+      const h = w.history.find((x) => x.comp === comp.name && x.level === comp.level)
+      if (h) h.result = place
+    }
+    // how much the board, fans and prize fund care, relative to a senior tournament
+    const k = comp.level === 'senior' ? 1 : comp.key.startsWith('olympics') ? 0.6 : comp.key.startsWith('fifa-') ? 0.4 : comp.key.startsWith('asian-games') ? 0.35 : 0.2
+    if (third && place === 'Bronze medal') { w.fed.board = clamp(w.fed.board + 10 * k, 0, 100); w.fed.fans = clamp(w.fed.fans + 12 * k, 0, 100) }
     if (place && !w.history.some((h) => h.comp === comp.name && h.level === comp.level)) w.history.push({ year: comp.season, comp: comp.name, level: comp.level, result: place })
     if (comp.winner) {
       const win = teamName(w, comp.winner).name
       this.msg('news', `${win} win the ${comp.name}`, comp.winner === iran ? `Iran are champions! The federation's standing has never been higher.` : `${win} lifted the trophy.${place ? ` Iran's campaign ended: ${place}.` : ''}`, true, `comp:${comp.id}`)
-      if (comp.winner === iran) { w.fed.board = clamp(w.fed.board + 25, 0, 100); w.fed.fans = clamp(w.fed.fans + 25, 0, 100); w.fed.budget += 5_000_000; w.fed.ledger.push({ day: w.day, label: `${comp.name} prize money`, amount: 5_000_000 }) }
+      if (comp.winner === iran) { const prize = Math.round(5_000_000 * k); w.fed.board = clamp(w.fed.board + 25 * k, 0, 100); w.fed.fans = clamp(w.fed.fans + 25 * k, 0, 100); w.fed.budget += prize; w.fed.ledger.push({ day: w.day, label: `${comp.name} prize money`, amount: prize }) }
     }
+    this.qualifyFrom(comp)
     for (const k of Object.keys(w.natSquads)) if (k.startsWith(`${comp.id}|`)) delete w.natSquads[k]
     rerank(w)
+  }
+  /** The Asian age-group cups are the qualifiers for the world tournaments: create those once the places are known. */
+  private qualifyFrom(comp: Comp) {
+    const w = this.w
+    const m = /^afc-(u17|u20|u23):(\d+)$/.exec(comp.key)
+    if (!m) return
+    const year = +m[2]
+    const level = m[1] as 'u17' | 'u20' | 'u23'
+    if (level === 'u23' && !(year >= 2028 && (year - 2028) % 4 === 0)) return
+    // quarter-finalists (U17), semi-finalists (U20) or finalists (U23) go through
+    const stage = comp.stages[level === 'u17' ? 1 : level === 'u20' ? 2 : 3] as KoStage
+    const afc = stage.teams.map((r) => r.split(':')[1])
+    const key = level === 'u23' ? `olympics:${year}` : `fifa-${level}:${year}`
+    if (w.comps.some((c) => c.key === key)) return
+    const next = level === 'u23' ? setupOlympics(w, this.rng, year, afc) : setupYouthWorldCup(w, this.rng, level, year, afc)
+    const first = (next.stages[0] as GroupStage).days[0]
+    if (afc.includes('IRN')) {
+      this.msg('news', `Iran ${LEVEL_NAME[level]} qualify for the ${next.name}`, `A place at the ${next.name} is secured through the ${comp.name}. The tournament starts on ${fmtDay(first)}${next.overage ? `; the squad of ${next.squadSize} may include ${next.overage} over-age players` : ''}.`, true, `comp:${next.id}`)
+      w.fed.board = clamp(w.fed.board + (level === 'u23' ? 6 : 3), 0, 100)
+    } else this.msg('news', `Iran ${LEVEL_NAME[level]} miss out on the ${next.name}`, `The ${comp.name} was the qualifier and Iran did not finish high enough. The tournament goes ahead without them.`, level === 'u23', `comp:${next.id}`)
+    this.resolveClashes()
+    rebuildCamps(w)
+    this.idx = buildIndex(w)
   }
   private leagueDone(comp: Comp) {
     const w = this.w
@@ -661,7 +721,22 @@ export class Game {
       this.afterFixture(f)
       return
     }
+    if (comp.level !== 'senior' && !f.home.startsWith('n:IRN:') && !f.away.startsWith('n:IRN:')) return this.fastNat(f, comp)
     this.finishNat(f, this.makeSim(f, false, -1).run())
+  }
+  /** Age-group matches between two other nations: a quick result from the nations' levels, no squads needed. */
+  private fastNat(f: Fixture, comp: Comp) {
+    const lv = (ref: string) => this.w.nations[ref.split(':')[1]]?.level ?? 60
+    const d = lv(f.home) - lv(f.away) + (f.neutral ? 0 : 2)
+    f.hg = this.rng.poisson(1.35 * Math.exp(0.05 * d))
+    f.ag = this.rng.poisson(1.35 * Math.exp(-0.05 * d))
+    if (this.isKo(f, comp) && f.hg === f.ag) {
+      const st = comp.stages[f.stage] as KoStage
+      const level = st.legs === 1 || (() => { const first = this.w.fixtures.find((x) => x.compId === f.compId && x.stage === f.stage && x.slot === f.slot && x.round === 0); return !first || first.hg + f.ag === first.ag + f.hg })()
+      if (level) { f.et = true; const home = this.rng.chance(0.5 + d * 0.01); f.pens = home ? [5, this.rng.int(2, 4)] : [this.rng.int(2, 4), 5] }
+    }
+    f.played = true
+    this.afterFixture(f)
   }
 
   // live (user-managed or watched) match

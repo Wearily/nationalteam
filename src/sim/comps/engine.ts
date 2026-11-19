@@ -208,6 +208,8 @@ export function progress(w: World, comp: Comp, rng: Rng): boolean {
     }
     teams = teams.filter(Boolean)
     next.teams = teams
+    comp.placings ??= {}
+    for (const t of tabs) for (const r of t) if (!teams.includes(r.team)) comp.placings[r.team] ??= st.name
     comp.cur = si + 1
     makeKoFixtures(w, comp, si + 1)
     return true

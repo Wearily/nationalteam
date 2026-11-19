@@ -3,6 +3,7 @@ import { useMemo } from 'react'
 import { fmtDay } from '../../sim/core/date'
 import { formAvg } from '../../sim/clubs/season'
 import { posLine } from '../../sim/ratings/attributes'
+import { ageEligible } from '../../sim/intl/select'
 import { LEVEL_NAME, LEVELS, type Level, type Player } from '../../sim/world/types'
 import { ageOf, clubOf, Empty, Flag, FormDots, isAbroad, Ovr, PlayerLink, PosTag, Rating } from '../bits'
 import { useGame } from '../store'
@@ -28,6 +29,8 @@ export function Teams({ level, tab }: { level: Level; tab?: string }) {
   const fixtures = useMemo(() => world.fixtures.filter((f) => f.home === ref || f.away === ref).sort((a, b) => a.day - b.day), [world, ref])
   const picked = [...pick].map((id) => world.players[id])
   const lines = ['GK', 'DEF', 'MID', 'ATT'] as const
+  const overage = camp ? world.comps[camp.compId]?.overage ?? 0 : 0
+  const overN = overage ? picked.filter((p) => !ageEligible(p, level, world.day)).length : 0
   const toggle = (p: Player) => setPick((s) => { const n = new Set(s); if (n.has(p.id)) n.delete(p.id); else n.add(p.id); return n })
   const announce = async () => { const err = await cmd<string | null>('announceSquad', level, [...pick], false); notify(err ?? `${LEVEL_NAME[level]} squad announced.`); if (!err) { setDraft(level, null); go({ name: 'teams', level, tab: 'squad' }) } }
   const sameAgain = async () => {
@@ -72,9 +75,9 @@ export function Teams({ level, tab }: { level: Level; tab?: string }) {
       {cur === 'callup' && (
         camp && !camp.announced ? (
           <div className="grid" style={{ gridTemplateColumns: 'minmax(0,1fr) 340px', alignItems: 'start' }}>
-            <PoolTable level={level} selected={pick} onToggle={toggle} height={720} />
+            <PoolTable level={level} selected={pick} onToggle={toggle} height={720} overage={overage} />
             <div className="card col" style={{ position: 'sticky', top: 0 }}>
-              <div><span className="eyebrow">{camp.label}</span><h2 style={{ marginTop: 4 }}>{pick.size} <span className="faint">/ {camp.size}</span></h2><span className="faint" style={{ fontSize: 12 }}>First match {fmtDay(camp.first)} · {abroadN} based abroad</span></div>
+              <div><span className="eyebrow">{camp.label}</span><h2 style={{ marginTop: 4 }}>{pick.size} <span className="faint">/ {camp.size}</span></h2><span className="faint" style={{ fontSize: 12 }}>First match {fmtDay(camp.first)} · {abroadN} based abroad{overage ? <> · <b style={{ color: overN > overage ? '#fca5a5' : undefined }}>over-age {overN}/{overage}</b></> : null}</span></div>
               <div className="row"><button className="btn grow" onClick={() => void suggest()}><Wand2 />Coach's pick</button><button className="btn" onClick={() => setPick(new Set())}>Clear</button></div>
               <button className="btn" onClick={() => void sameAgain()} title="Start from the previous squad, then edit it"><History />Last squad</button>
               <div className="scroll col" style={{ maxHeight: 440, gap: 12 }}>

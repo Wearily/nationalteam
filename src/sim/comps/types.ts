@@ -59,6 +59,8 @@ export interface Comp {
   friendly?: boolean
   /** Final placing notes for history. */
   placings?: Record<TeamRef, string>
+  /** Players over the age limit allowed in a squad (Olympics, Asian Games). */
+  overage?: number
   /** True when the format/entrants are assumed rather than confirmed. */
   assumed?: boolean
 }

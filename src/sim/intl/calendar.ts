@@ -261,6 +261,94 @@ export function setupYouthCup(w: World, rng: Rng, level: Level, year: number, d0
   return comp
 }
 
+/** Fill a world field: the given entrants first, then each confederation up to its quota by ranking. */
+function worldField(w: World, rng: Rng, size: number, fixed: string[], quota: [string, number][]): string[] {
+  const ex = new Set<string>(fixed.filter((c) => w.nations[c]))
+  const field = [...ex]
+  for (const [conf, n] of quota) {
+    const have = field.filter((c) => w.nations[c].confed === conf).length
+    for (const c of pick(w, conf, Math.max(0, n - have), rng, ex)) { field.push(c); ex.add(c) }
+  }
+  // Iran only ever enter through qualifying, never as a make-weight
+  const rest = Object.values(w.nations).filter((n) => !ex.has(n.code) && n.code !== 'IRN').sort((a, b) => b.points - a.points)
+  while (field.length < size && rest.length) field.push(rest.shift()!.code)
+  return field.slice(0, size)
+}
+/** Draw into groups from ranking pots, hosts seeded first. */
+function drawGroups(w: World, rng: Rng, field: string[], G: number, level: Level, hosts: string[] = []): string[][] {
+  const hs = new Set(hosts)
+  const ranked = [...field].sort((a, b) => Number(hs.has(b)) - Number(hs.has(a)) || w.nations[b].points - w.nations[a].points)
+  const groups: string[][] = Array.from({ length: G }, () => [])
+  for (let pot = 0; pot * G < ranked.length; pot++) rng.shuffle(ranked.slice(pot * G, pot * G + G)).forEach((t, i) => groups[i].push(natRef(t, level)))
+  return groups
+}
+const koStage = (d0: Day, name: string, days: number[], third?: number) => ({ type: 'ko' as const, name, legs: 1 as const, days: days.map((d) => d0 + d), neutral: true, teams: [], fixturesMade: false, thirdPlace: third != null ? d0 + third : undefined })
+const randomHost = (w: World, rng: Rng, not: string) => rng.pick(Object.values(w.nations).filter((n) => n.confed !== not).sort((a, b) => b.points - a.points).slice(0, 40)).code
+
+/**
+ * FIFA U-17 World Cup (48 teams, every November) and U-20 World Cup (24 teams, odd years). AFC entrants are
+ * the teams that qualified through that year's Asian age-group cup; the rest of the field is filled by ranking.
+ */
+export function setupYouthWorldCup(w: World, rng: Rng, level: 'u17' | 'u20', year: number, afc: string[]): Comp {
+  const u17 = level === 'u17'
+  const host = u17 ? 'QAT' : randomHost(w, rng, 'AFC')
+  const field = worldField(w, rng, u17 ? 48 : 24, [host, ...afc], u17
+    ? [['AFC', afc.length + (afc.includes('QAT') ? 0 : 1)], ['CAF', 10], ['CONCACAF', 8], ['CONMEBOL', 7], ['OFC', 3], ['UEFA', 11]]
+    : [['AFC', afc.length], ['CAF', 4], ['CONCACAF', 4], ['CONMEBOL', 4], ['OFC', 2], ['UEFA', 5]])
+  const d0 = u17 ? toDay(year, 11, 5) : toDay(year, 9, 27)
+  const comp: Comp = {
+    id: w.comps.length, key: `fifa-${level}:${year}`, name: `FIFA ${LEVEL_NAME[level]} World Cup ${year}`, short: `${LEVEL_NAME[level]} World Cup`, scope: 'nat', level, season: year, weight: 0, host,
+    bracket: u17 ? 'std' : 'afc24',
+    stages: u17
+      ? [{ type: 'groups', name: 'Group stage', groups: drawGroups(w, rng, field, 12, level, [host]), legs: 1, days: [d0, d0 + 3, d0 + 6], offsets: [0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3], neutral: true, tiebreak: 'h2h', advance: 2, bestNext: 8, fixturesMade: false },
+          koStage(d0, 'Round of 32', [11, 12, 13]), koStage(d0, 'Round of 16', [15, 16]), koStage(d0, 'Quarter-finals', [19, 20]), koStage(d0, 'Semi-finals', [23]), koStage(d0, 'Final', [27], 26)]
+      : [{ type: 'groups', name: 'Group stage', groups: drawGroups(w, rng, field, 6, level, [host]), legs: 1, days: [d0, d0 + 3, d0 + 6], offsets: [0, 0, 1, 1, 2, 2], neutral: true, tiebreak: 'h2h', advance: 2, bestNext: 4, fixturesMade: false },
+          koStage(d0, 'Round of 16', [10, 11, 12]), koStage(d0, 'Quarter-finals', [14, 15]), koStage(d0, 'Semi-finals', [18]), koStage(d0, 'Final', [22], 21)],
+    cur: 0, done: false, squadSize: 21, subs: 5, assumed: true,
+  }
+  w.comps.push(comp)
+  makeGroupFixtures(w, comp, 0)
+  return comp
+}
+
+const OLYMPIC_HOSTS: Record<number, string> = { 2028: 'USA', 2032: 'AUS' }
+/** Men's Olympic football: under-23 sides with three over-age players, twelve teams, the two Asian places from the U23 Asian Cup. */
+export function setupOlympics(w: World, rng: Rng, year: number, afc: string[]): Comp {
+  const host = OLYMPIC_HOSTS[year] ?? randomHost(w, rng, 'OFC')
+  const field = worldField(w, rng, 12, [host, ...afc], [['AFC', afc.length + (w.nations[host]?.confed === 'AFC' && !afc.includes(host) ? 1 : 0)], ['UEFA', 3], ['CAF', 2], ['CONMEBOL', 2], ['CONCACAF', 1 + (w.nations[host]?.confed === 'CONCACAF' ? 1 : 0)], ['OFC', 1]])
+  const d0 = toDay(year, 7, 24)
+  const comp: Comp = {
+    id: w.comps.length, key: `olympics:${year}`, name: `Olympic Games ${year}`, short: 'Olympics', scope: 'nat', level: 'u23', season: year, weight: 0, host, bracket: 'std', overage: 3,
+    stages: [
+      { type: 'groups', name: 'Group stage', groups: drawGroups(w, rng, field, 3, 'u23', [host]), legs: 1, days: [d0, d0 + 3, d0 + 6], offsets: [0, 0, 1], neutral: true, tiebreak: 'h2h', advance: 2, bestNext: 2, fixturesMade: false },
+      koStage(d0, 'Quarter-finals', [9, 10]), koStage(d0, 'Semi-finals', [13]), koStage(d0, 'Gold medal match', [17], 16),
+    ],
+    cur: 0, done: false, squadSize: 18, subs: 5, assumed: true,
+  }
+  w.comps.push(comp)
+  makeGroupFixtures(w, comp, 0)
+  return comp
+}
+
+const ASIAD_HOSTS: Record<number, string> = { 2030: 'QAT', 2034: 'KSA' }
+/** Asian Games men's football: under-23 sides with three over-age players, 24 Asian teams, entered without qualifying. */
+export function setupAsianGames(w: World, rng: Rng, year: number): Comp {
+  const host = w.nations[ASIAD_HOSTS[year]] ? ASIAD_HOSTS[year] : 'JPN'
+  const field = worldField(w, rng, 24, ['IRN', host], [['AFC', 24]])
+  const d0 = toDay(year, 9, 14)
+  const comp: Comp = {
+    id: w.comps.length, key: `asian-games:${year}`, name: `Asian Games ${year}`, short: 'Asian Games', scope: 'nat', level: 'u23', season: year, weight: 0, host, bracket: 'afc24', overage: 3,
+    stages: [
+      { type: 'groups', name: 'Group stage', groups: drawGroups(w, rng, field, 6, 'u23', [host]), legs: 1, days: [d0, d0 + 3, d0 + 6], offsets: [0, 0, 0, 1, 1, 1], neutral: true, tiebreak: 'h2h', advance: 2, bestNext: 4, fixturesMade: false },
+      koStage(d0, 'Round of 16', [10, 11]), koStage(d0, 'Quarter-finals', [14]), koStage(d0, 'Semi-finals', [17]), koStage(d0, 'Gold medal match', [21], 20),
+    ],
+    cur: 0, done: false, squadSize: 22, subs: 5, assumed: true,
+  }
+  w.comps.push(comp)
+  makeGroupFixtures(w, comp, 0)
+  return comp
+}
+
 /** Everything that should be created for the coming calendar year (called each 1 December and at the start). */
 export function planYear(w: World, rng: Rng, year: number, from: Day) {
   const has = (key: string) => w.comps.some((c) => c.key === key)
@@ -273,6 +361,7 @@ export function planYear(w: World, rng: Rng, year: number, from: Day) {
   if (year % 2 === 0 && !has(`afc-u23:${year}`) && toDay(year, 4, 14) > from) setupYouthCup(w, rng, 'u23', year, toDay(year, 4, 14))
   if (year % 2 === 1 && !has(`afc-u20:${year}`) && toDay(year, 2, 12) > from) setupYouthCup(w, rng, 'u20', year, toDay(year, 2, 12))
   if (!has(`afc-u17:${year}`) && toDay(year, 5, 5) > from) setupYouthCup(w, rng, 'u17', year, toDay(year, 5, 5))
+  if (year >= 2030 && (year - 2030) % 4 === 0 && !has(`asian-games:${year}`)) setupAsianGames(w, rng, year)
   w.plannedThrough = Math.max(w.plannedThrough ?? 0, year)
   cancelClashingFriendlies(w)
   scheduleYear(w, rng, year, from)
