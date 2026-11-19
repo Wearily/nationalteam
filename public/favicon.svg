@@ -1,1 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><clipPath id="c"><rect width="64" height="64" rx="16"/></clipPath></defs><g clip-path="url(#c)"><rect width="64" height="22" fill="#16a34a"/><rect y="21" width="64" height="22" fill="#f8fafc"/><rect y="42" width="64" height="22" fill="#dc2626"/></g><circle cx="32" cy="32" r="10" fill="#0b0d12" stroke="#fff" stroke-width="3"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><clipPath id="c"><rect width="64" height="64" rx="14"/></clipPath></defs><g clip-path="url(#c)"><rect width="64" height="64" fill="#fff"/><rect width="64" height="16" fill="#239f40"/><rect y="48" width="64" height="16" fill="#da0000"/><g fill-rule="evenodd" transform="translate(32 31.4) scale(0.19) translate(-434 -248)"><g fill="#da0000">
+      <path d="M457 191.4c8.3 10 33.5 65.5-15.2 101.9-22.9 17.2-8.7 18-8 21 36.8-19.6 48.8-46 48.5-69.8s-12.8-44.6-25.2-53.1z"/>
+      <path d="M462 188.8a71 71 0 0 1 15 108.8c26.4-5.8 60-83.7-15.2-108.8zm-55.9 0a71 71 0 0 0-15 108.8c-26.5-5.8-60.1-83.7 15-108.8"/>
+      <path d="M411 191.4c-8.2 10-33.5 65.5 15.2 101.9 22.9 17.2 8.7 18 8 21-36.7-19.6-48.8-46-48.5-69.8s12.9-44.6 25.3-53.1"/>
+      <path d="M480.7 309.2a102 102 0 0 1-46-9c2.2 4.3 4 7 6.3 11.4 12.8 1.1 30.5 2.6 39.7-2.4m-92 0c14.4.2 32.6-2 46-9-2.2 4.3-4 7-6.3 11.4-12.8 1.1-30.5 2.6-39.7-2.4m26.4-134.4c3 7.7 10.6 8.9 18.8 4.3 6 3.6 15.2 3.8 18.4-4 2.4 19.2-17.8 14.7-18.5 11-7.5 7.2-21.5 3-18.7-11.3"/>
+      <path d="m434.4 321.3 7.6-8.7 1-116.4-9-8-9 7.6 1.8 117.2z"/>
+    </g></g></g></svg>
