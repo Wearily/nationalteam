@@ -56,6 +56,17 @@ if (process.argv[1]?.endsWith('calibrate.ts')) {
   console.log(`yellows ${per('yellows')} [3.2-4.6]  reds ${per('reds')} [0.1-0.25]  tackles won ${per('tackles')}  injuries ${per('inj')}  possH ${per('possH')}`)
   console.log(`H ${(hw / N * 100).toFixed(0)}%  D ${(d / N * 100).toFixed(0)}%  A ${(aw / N * 100).toFixed(0)}%   avg rating ${(acc.rating / N / 2).toFixed(2)} max ${(acc.ratingMax / N / 2).toFixed(2)} min ${(acc.ratingMin / N / 2).toFixed(2)}`)
   console.log(Object.entries(scores).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([k, v]) => `${k}:${v}`).join(' '))
+  // mirrored formations at home: the home side should win more often than the away side
+  {
+    const r2 = new Rng(3); let H = 0, Aw = 0, sh = 0, sa = 0
+    const M = Math.min(N, 300)
+    for (let i = 0; i < M; i++) {
+      const m = new MatchSim(synthTeam(r2, 'H', 72, '4-3-3', 0), synthTeam(r2, 'A', 72, '4-3-3', 100), { seed: r2.int(1, 1e9), neutral: false, knockout: false, subs: 5, importance: 0.5, record: false }).run()
+      if (m.score[0] > m.score[1]) H++; else if (m.score[0] < m.score[1]) Aw++
+      sh += m.ts[0].shots; sa += m.ts[1].shots
+    }
+    console.log(`mirrored 4-3-3: home wins ${Math.round((H / M) * 100)}%  away wins ${Math.round((Aw / M) * 100)}% [home > away]  shots ${(sh / M).toFixed(1)}-${(sa / M).toFixed(1)}`)
+  }
   void import('./shotshare').then(({ shotShare }) => {
     const pc = (x: number) => `${Math.round(x * 100)}%`
     for (const gap of [0, 12]) {

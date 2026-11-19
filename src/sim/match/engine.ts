@@ -42,6 +42,8 @@ const SUB_MARKS = [58, 68, 76, 84, 96, 106]
 type Restart = 'kickoff' | 'goalkick' | 'corner' | 'freekick' | 'throw' | 'penalty' | null
 
 const LONG = 0.12
+const RATE_KNEE = 7.7
+const RATE_SPAN = 2.6
 export class MatchSim {
   teams: [MTeam, MTeam]
   opts: MatchOpts
@@ -167,7 +169,11 @@ export class MatchSim {
   private name(t: 0 | 1, s: number) { return this.pl(t, s)?.short ?? '' }
   private rate(t: 0 | 1, s: number, d: number) {
     const i = this.on[t][s]
-    if (i >= 0) this.ps[t][i].rating = clamp(this.ps[t][i].rating + d, 3, 10)
+    if (i < 0) return
+    const cur = this.ps[t][i].rating
+    // the higher the mark already is, the less each further good action adds: 10 takes a complete performance
+    if (d > 0 && cur > RATE_KNEE) d *= Math.max(0.12, 1 - (cur - RATE_KNEE) / RATE_SPAN)
+    this.ps[t][i].rating = clamp(cur + d, 3, 10)
   }
   private touch(t: 0 | 1, s: number) {
     const i = this.on[t][s]
@@ -258,6 +264,30 @@ export class MatchSim {
       for (let s = 1; s < 11; s++) if (this.on[o][s] >= 0) deepest = Math.max(deepest, 1 - this.nx(o, this.px[this.gi(o, s)]))
       lineX[t] = Math.max(deepest, this.nx(t, this.bx))
     }
+    // the defending side's centre backs pick up the most advanced attackers. Worked out for the whole
+    // pitch before anyone moves, so neither side reacts to the other's updated positions
+    const marks = new Map<number, number>() // defender global index → attacker global index
+    {
+      const d = (1 - this.poss) as 0 | 1
+      const a = this.poss
+      const adv: [number, number][] = []
+      for (let k = 1; k < 11; k++) if (this.on[a][k] >= 0 && k !== this.carrier) adv.push([this.nx(a, this.px[this.gi(a, k)]), k])
+      adv.sort((x, y) => y[0] - x[0])
+      for (const [anx, k] of adv.slice(0, 2)) {
+        if (anx < 0.66) break
+        const ga = this.gi(a, k)
+        let best = -1
+        let bd = 14
+        for (let s = 1; s < 11; s++) {
+          if (this.on[d][s] < 0 || this.slots[d][s].pos !== 'CB' || marks.has(this.gi(d, s))) continue
+          const dist = Math.hypot(this.px[this.gi(d, s)] - this.px[ga], this.py[this.gi(d, s)] - this.py[ga])
+          if (dist < bd) { bd = dist; best = s }
+        }
+        if (best >= 0) marks.set(this.gi(d, best), ga)
+      }
+    }
+    const snapX = Float64Array.from(this.px)
+    const snapY = Float64Array.from(this.py)
     for (const t of [0, 1] as const) {
       const inPoss = this.poss === t
       const tac = this.teams[t].tactic
@@ -282,6 +312,12 @@ export class MatchSim {
           const k = pressers.indexOf(s) === 0 ? 0.85 : 0.5
           wx += (this.bx - wx) * k
           wy += (this.by - wy) * k
+        } else if (marks.has(g)) {
+          // goal-side of his man, as tight as his marking allows
+          const ga = marks.get(g)!
+          const tight = 0.3 + (this.at(t, s, A.marking) / 99) * 0.35
+          wx += (snapX[ga] + (t === 0 ? -1.5 : 1.5) - wx) * tight
+          wy += (snapY[ga] - wy) * tight
         }
         const dx = wx - this.px[g]
         const dy = wy - this.py[g]
@@ -473,11 +509,13 @@ export class MatchSim {
     const mine = this.slots[t][s].pos
     // a striker in on goal usually shoots; others look for a better-placed team-mate more often
     const pShare = clamp((mine === 'ST' ? 0.74 : 0.36) + (this.at(t, s, A.teamwork) - 60) / 250 + (this.at(t, s, A.vision) - 60) / 300 - (this.roles[t][s].shoot - 1) * 0.25, 0.1, 0.75)
-    if (!this.rng.chance(pShare)) return this.shoot(t, s, 'open')
+    // a man who already has two is watched closely: more of the later chances fall to others
+    const hot = (k: number) => (this.st(t, k).goals >= 2 ? 1 : 0)
+    if (!this.rng.chance(clamp(pShare + hot(s) * 0.15, 0.1, 0.85))) return this.shoot(t, s, 'open')
     const cands: number[] = []
     for (let j = 1; j < 11; j++) if (j !== s && this.on[t][j] >= 0) cands.push(j)
     if (!cands.length) return this.shoot(t, s, 'open')
-    const j = this.rng.weighted(cands, (c) => W[this.slots[t][c].pos] * this.roles[t][c].shoot * (0.5 + (this.at(t, c, A.offTheBall) + this.at(t, c, A.finishing)) / 240))
+    const j = this.rng.weighted(cands, (c) => W[this.slots[t][c].pos] * this.roles[t][c].shoot * (hot(c) ? 0.55 : 1) * (0.5 + (this.at(t, c, A.offTheBall) + this.at(t, c, A.finishing)) / 240))
     const g = this.gi(t, s)
     const gj = this.gi(t, j)
     const pos = this.slots[t][j].pos
@@ -528,7 +566,7 @@ export class MatchSim {
     if (rnx > 0.55 && fwd > 0.1 && j !== 0) {
       let line = 0
       for (let k = 1; k < 11; k++) if (this.on[o][k] >= 0) line = Math.max(line, 1 - this.nx(o, this.px[this.gi(o, k)]))
-      if (rnx >= line - 0.012 && this.rng.chance(0.13 + (this.teams[o].tactic.line / 100) * 0.12 - this.at(t, j, A.offTheBall) / 900)) {
+      if (rnx >= line - 0.012 && this.rng.chance(0.14 + (this.teams[o].tactic.line / 100) * 0.12 - this.at(t, j, A.offTheBall) / 900)) {
         this.st(t, j).offsides++; this.ts[t].offsides++
         this.ev('offside', t, `${this.name(t, j)} is caught offside.`, { p: this.pl(t, j)!.id })
         this.bx = this.px[gj]; this.by = this.py[gj]
@@ -548,7 +586,7 @@ export class MatchSim {
         this.st(t, j).lost++
         this.rate(t, j, -0.06)
         this.st(o, open.s).interceptions++
-        this.rate(o, open.s, 0.07)
+        this.rate(o, open.s, 0.035)
         this.lastPasser = -1
         this.setCarrier(o, open.s)
       }
@@ -574,7 +612,7 @@ export class MatchSim {
       }
       const is = this.closest(o, tx, ty, false)
       this.st(o, is).interceptions++
-      this.rate(o, is, 0.08)
+      this.rate(o, is, 0.05)
       const gi = this.gi(o, is)
       this.px[gi] += (tx - this.px[gi]) * 0.7
       this.py[gi] += (clamp(ty, 1, PW - 1) - this.py[gi]) * 0.7
@@ -710,9 +748,9 @@ export class MatchSim {
     if (xg > 0.3) this.ts[t].bigChances++
     this.mom(t, 0.5 + xg * 6)
     const assist = this.lastPasser >= 0 && this.lastPasser !== s && this.on[t][this.lastPasser] >= 0 ? this.lastPasser : -1
-    if (assist >= 0) { this.st(t, assist).keyPasses++; this.st(t, assist).xa += xg; this.rate(t, assist, 0.12 + xg * 0.5) }
+    if (assist >= 0) { this.st(t, assist).keyPasses++; this.st(t, assist).xa += xg; this.rate(t, assist, 0.05 + xg * 0.35) }
     this.tick(1.2)
-    const pGoal = clamp(xg * (1.45 + (fin - gk) / 150), 0.005, 0.95)
+    const pGoal = clamp(xg * (1.53 + (fin - gk) / 150), 0.005, 0.95)
     const pOn = clamp(Math.max(pGoal + 0.03, 0.4 + (fin - 62) / 170 - pressure * 0.12 + (dist < 11 ? 0.12 : 0) - (header ? 0.05 : 0)), 0, 0.92)
     const pBlock = kind === 'pen' ? 0 : clamp(0.1 + pressure * 0.26 + (dist > 18 ? 0.06 : 0), 0, 0.42)
     const gx = this.wx(t, 1)
@@ -1021,7 +1059,6 @@ export class MatchSim {
           if (line === 'GK' || line === 'CB' || line === 'RB' || line === 'LB') r += 0.5
           else if (line === 'DM') r += 0.25
         }
-        if (r > 8.2) r = 8.2 + (r - 8.2) * 0.56 // the top of the scale is hard to reach
         st.rating = Math.round(clamp(r, 3, 10) * 10) / 10
       }
     }
