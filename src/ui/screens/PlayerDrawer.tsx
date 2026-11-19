@@ -49,7 +49,7 @@ export function PlayerProfile({ id }: { id: number }) {
   if (!p) return null
   const photo = playerPhoto(p)
   // FotMob headshots are cut-outs; anything else is an ordinary photograph and fills the side panel
-  const fullPhoto = !!photo && !photo.startsWith('faces/fm/')
+  const fullPhoto = !!photo && !photo.startsWith('faces/fm/') && !photo.startsWith('faces/gen/')
   const v = scoutView(p)
   const d = dynOvr(p)
   const eng = engineDelta(p)

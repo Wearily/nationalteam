@@ -7,6 +7,7 @@ import type { World } from '../sim/world/state'
 import type { Player, Pos } from '../sim/world/types'
 import LOGOS from '../../data/overrides/logos.json'
 import PHOTOS from '../../data/overrides/photos.json'
+import FACES from './faces.json'
 import { FIFA_ISO } from './flags'
 import { useGame } from './store'
 
@@ -114,7 +115,21 @@ export function Portrait({ p, kit }: { p: Player; kit?: string }) {
   )
 }
 /** Headshot path: FotMob-sourced override by player id first, then the dataset's own photo. */
-export const playerPhoto = (p: Player): string | undefined => (p.rid ? (PHOTOS as Record<string, string>)[p.rid] : undefined) ?? p.photo
+const FACE_SETS: [string, number][] = [['u18', 18], ['19-24', 24], ['25-30', 30], ['31-36', 99]]
+/**
+ * Auto-generated Iranian players get a generated headshot (pipeline/11-faces.py): always the same one
+ * for a given player within an age set, moving to the next set as he gets older, like a new season's photo.
+ */
+function generatedFace(p: Player): string | undefined {
+  if (p.real || p.nat[0] !== 'IRN') return undefined
+  const day = useGame.getState().w?.day
+  if (day == null) return undefined
+  const age = ageOn(p.dob, day)
+  const set = FACE_SETS.find(([, max]) => age <= max)![0]
+  const n = (FACES as Record<string, number>)[set] ?? 0
+  return n ? `faces/gen/${set}-${String(hashStr(`face:${p.id}`) % n).padStart(3, '0')}.webp` : undefined
+}
+export const playerPhoto = (p: Player): string | undefined => (p.rid ? (PHOTOS as Record<string, string>)[p.rid] : undefined) ?? p.photo ?? generatedFace(p)
 export function Face({ p }: { p: Player }) {
   const src = playerPhoto(p)
   return src ? <img src={`${import.meta.env.BASE_URL}${src}`} alt="" loading="lazy" /> : <Portrait p={p} />
