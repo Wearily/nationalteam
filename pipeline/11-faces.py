@@ -67,7 +67,7 @@ for path in sorted(glob.glob('faces-raw/*.png')):
     for (x0, y0, x1, y1) in cs:
         c = im.crop((x0 + 3, y0 + 3, x1 - 3, y1 - 3))
         n = counts.get(age, 0)
-        finish(cut_green(c) if green else cut_grey(c)).save(f'{OUT}/{age}-{n:03d}.webp', quality=88, method=6)
+        finish(cut_green(c) if green else cut_grey(c)).save(f'{OUT}/{age}-{n:03d}.webp', quality=88, method=4)
         counts[age] = n + 1
 json.dump(counts, open('src/ui/faces.json', 'w'))
 print(counts)
