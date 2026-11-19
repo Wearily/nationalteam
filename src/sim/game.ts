@@ -842,6 +842,20 @@ export class Game {
     }
   }
 
+  /**
+   * Keep the calendar drawn at least six months ahead: from July the following year's windows, qualifiers
+   * and tournaments are created, so there is always something on the horizon and next spring can be booked.
+   */
+  planAhead() {
+    const w = this.w
+    const { y, m } = ymd(w.day)
+    const want = m >= 7 ? y + 1 : y
+    if ((w.plannedThrough ?? (m === 12 ? y + 1 : y)) >= want) return
+    planYear(w, this.rng, want, w.day)
+    this.resolveClashes()
+    this.idx = buildIndex(w)
+  }
+
   /** Call off friendlies that now clash with competitive fixtures, and tell the user. */
   resolveClashes() {
     const w = this.w
@@ -988,7 +1002,7 @@ export class Game {
         for (const n of seasonRollover(w, this.rng, w.day)) this.msg('news', n.split(' has ')[0].split(' (')[0], n)
         this.idx = buildIndex(w)
       }
-      if (m === 12) { planYear(w, this.rng, y + 1, w.day); this.resolveClashes(); this.idx = buildIndex(w) }
+      this.planAhead()
       if (m === 4 && y >= 2030 && (y - 2030) % 4 === 0 && !w.comps.some((c) => c.key === `world-cup:${y}`)) {
         const hosts = y === 2030 ? ['ESP', 'POR', 'MAR'] : [Object.values(w.nations).sort((a, b) => b.points - a.points)[this.rng.int(0, 15)].code]
         const wc = setupWorldCup(w, this.rng, y, hosts)

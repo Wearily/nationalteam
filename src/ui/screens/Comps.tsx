@@ -159,7 +159,7 @@ export function Calendar() {
               <select className="input grow" value={opp} onChange={(e) => void cmd<string>('arrangeFriendly', f.id, e.target.value).then(notify)}>{nations.map((n) => <option key={n.code} value={n.code}>#{n.rank} {n.name}</option>)}</select>
               <button className="btn sm danger" onClick={() => void cmd<string>('cancelFriendly', f.id).then(notify)}>Cancel</button></div>
           ) })}
-          {!slots.length && !friendlies.length && <span className="faint">No open dates in the coming windows.</span>}
+          {!slots.length && !friendlies.length && <span className="faint">{managed.length ? `Every date in the windows drawn so far is taken. The ${(world.plannedThrough ?? ymd(world.day).y) + 1} windows open for booking in July ${world.plannedThrough ?? ymd(world.day).y}.` : 'You are not managing a team: the coaches arrange their own friendlies.'}</span>}
         </div>
         <div className="card col"><h3>Squad deadlines</h3>
           {camps.length ? camps.map((c) => <div key={c.id} className="row" style={{ padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.045)' }}><div className="grow"><b>{c.label}</b><div className="faint" style={{ fontSize: 12 }}>{LEVEL_NAME[c.level]} · up to {c.size} players · first match {fmtDay(c.first, false)}</div></div><span className={`pill ${c.announced ? 'green' : c.from <= world.day ? 'red' : ''}`}>{c.announced ? 'Named' : fmtDay(c.from, false)}</span></div>) : <span className="faint">Nothing due.</span>}

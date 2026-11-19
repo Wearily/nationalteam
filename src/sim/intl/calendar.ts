@@ -64,7 +64,7 @@ export function slotDays(level: Level, year: number): { day: Day; window: string
 /** Window dates with nothing booked yet, far enough ahead to arrange a match. */
 export function openSlots(w: World, level: Level): { day: Day; window: string }[] {
   const { y, m } = ymd(w.day)
-  // only years whose qualifiers and tournaments are already on the calendar: next year's are drawn on 1 December
+  // only years whose qualifiers and tournaments are already on the calendar: next year's are drawn each July
   const through = w.plannedThrough ?? (m === 12 ? y + 1 : y)
   const days = through > y ? [...slotDays(level, y), ...slotDays(level, y + 1)] : slotDays(level, y)
   return days.filter((s) => s.day - w.day >= 10 && s.day - w.day <= 400 && !iranBusy(w, level, s.day))

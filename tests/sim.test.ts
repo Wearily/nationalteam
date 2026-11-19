@@ -131,6 +131,9 @@ describe('career', () => {
     const ac = g.w.comps.find((c) => c.key.startsWith('afc-asian-cup'))!
     expect(ac.done).toBe(true)
     expect(ac.winner).toBeTruthy()
+    // 500 days in it is April 2028; the 2028 calendar was drawn back in July 2027, never left empty
+    expect(g.w.plannedThrough).toBe(2028)
+    expect(g.w.fixtures.some((f) => !f.played && (f.home === 'n:IRN:senior' || f.away === 'n:IRN:senior'))).toBe(true)
     // the Asian age-group cups feed the world tournaments
     for (const key of ['fifa-u20:2027', 'fifa-u17:2027']) {
       const c = g.w.comps.find((x) => x.key === key)!

@@ -18,6 +18,7 @@ const api = {
     game = new Game(w)
     game.applyPositionFixes(extra, positions as unknown as Record<string, Pos[] | string>)
     game.resolveClashes()
+    game.planAhead()
     game.restoreTournamentSquads()
     return game.w
   },
