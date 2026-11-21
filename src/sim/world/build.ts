@@ -13,12 +13,16 @@ export const nationLevel = (points: number) => clamp(57 + (points - 1000) * 0.03
 export const clubBase = (leagueStrength: number, rep: number) => 42 + (0.6 * leagueStrength + 0.4 * rep) * 0.42
 
 /** Market value in EUR from overall, age and potential. */
+// Market value model, fitted to the real values of about 300 players (see pipeline/10-fotmob-players.py):
+// what a 70-rated player in his prime is worth, how value fades with age, and the premium for potential.
+export const VALUE_BASE = 1_300_000
+export const valueAgeFactor = (age: number) => (age <= 21 ? 0.85 + (21 - age) * 0.02 : age <= 26 ? 1 : age <= 29 ? 1 - (age - 26) * 0.1 : age <= 33 ? 0.7 - (age - 29) * 0.08 : Math.max(0.08, 0.38 - (age - 33) * 0.06))
+export const valueLeagueFactor = (leagueStrength: number) => 0.45 + 0.55 * (leagueStrength / 90)
 export function valueOf(ovr: number, pot: number, age: number, leagueStrength: number): number {
-  let v = 2_500_000 * Math.exp(0.2 * (ovr - 70))
-  const ageF = age <= 21 ? 0.85 + (21 - age) * 0.02 : age <= 26 ? 1 : age <= 29 ? 1 - (age - 26) * 0.1 : age <= 33 ? 0.7 - (age - 29) * 0.13 : Math.max(0.04, 0.18 - (age - 33) * 0.05)
-  v *= ageF
-  if (age < 25) v *= 1 + Math.max(0, pot - ovr) * 0.07
-  v *= 0.45 + 0.55 * (leagueStrength / 90)
+  let v = VALUE_BASE * Math.exp(0.2 * (ovr - 70))
+  v *= valueAgeFactor(age)
+  if (age < 25) v *= 1 + Math.max(0, pot - ovr) * 0.045
+  v *= valueLeagueFactor(leagueStrength)
   const step = v > 10e6 ? 5e5 : v > 1e6 ? 1e5 : v > 1e5 ? 25e3 : 5e3
   return Math.max(10_000, Math.round(v / step) * step)
 }
@@ -129,9 +133,7 @@ export function buildWorld(raw: RawData, seed: number, managerName: string, over
     }
     // a real market value is strong evidence of level: pull the estimate toward what that value implies
     if (r.valueEur && r.valueEur > 20_000) {
-      const ageF = age <= 21 ? 0.85 + (21 - age) * 0.02 : age <= 26 ? 1 : age <= 29 ? 1 - (age - 26) * 0.1 : age <= 33 ? 0.7 - (age - 29) * 0.13 : Math.max(0.04, 0.18 - (age - 33) * 0.05)
-      const lgF = 0.45 + 0.55 * ((lg?.strength ?? 45) / 90)
-      const implied = 70 + Math.log(r.valueEur / (2_500_000 * ageF * lgF * (age < 24 ? 1.3 : 1))) / 0.2
+      const implied = 70 + Math.log(r.valueEur / (VALUE_BASE * valueAgeFactor(age) * valueLeagueFactor(lg?.strength ?? 45) * (age < 24 ? 1.2 : 1))) / 0.2
       est = est * 0.45 + clamp(implied, est - 9, est + 9) * 0.55
     }
     return est
@@ -200,7 +202,7 @@ export function buildWorld(raw: RawData, seed: number, managerName: string, over
         const nat = foreign ? rng.pick(foreignPool) : 'IRN'
         const age = clamp(Math.round(rng.normal(25.5, 4)), 18, 36)
         const dob = today - Math.round(age * 365.25) - rng.int(0, 364)
-        const pl = makePlayer(w, rng, { name: genName(rng, nat, nations[nat]?.confed), dob, nat: [nat], pos: [pos], clubId: c.id, ovr: base - 2 + rng.normal(0, 3.4) - (age < 22 ? (22 - age) * 2 : 0), today, leagueStrength: lg.strength })
+        const pl = makePlayer(w, rng, { name: genName(rng, nat, nations[nat]?.confed), dob, nat: [nat], pos: [pos], clubId: c.id, ovr: Math.min(base + 3, base - 2 + rng.normal(0, 3.4) - (age < 22 ? (22 - age) * 2 : 0)), today, leagueStrength: lg.strength })
         if (nat === 'IRN') { pl.iranStatus = 'committed'; pl.known = clamp(Math.round(40 + (lg.strength - 40) + (pl.ovr - 60) * 2), 15, 90) }
       }
     }
@@ -210,8 +212,9 @@ export function buildWorld(raw: RawData, seed: number, managerName: string, over
         const pos = YOUTH_SHAPE[k % YOUTH_SHAPE.length]
         const age = 14 + (k % 5) + (rng.chance(0.3) ? 1 : 0)
         const dob = today - Math.round(age * 365.25) - rng.int(0, 364)
-        const pot = clamp(Math.round(rng.normal(64 + (c.rep - 50) * 0.12, 7)), 48, 90)
-        const ovr = clamp(pot - (22 - age) * rng.range(2.2, 3.6), 30, pot)
+        // an academy prospect is not yet better than the first team: exceptional ceilings are rare
+        const pot = clamp(Math.round(rng.normal(64 + (c.rep - 50) * 0.12, 6)), 48, 86)
+        const ovr = clamp(Math.min(pot - (22 - age) * rng.range(2.2, 3.6), base - 1), 30, pot)
         const pl = makePlayer(w, rng, { name: genName(rng, 'IRN'), dob, nat: ['IRN'], pos: [pos], clubId: c.id, ovr, today, leagueStrength: lg.strength, pot })
         pl.iranStatus = 'committed'
         pl.known = clamp(Math.round(10 + (pot - 60) * 1.5 + rng.range(0, 25)), 5, 60)

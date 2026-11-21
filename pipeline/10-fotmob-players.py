@@ -189,6 +189,7 @@ def player(pid):
     if pos: e['pos'] = pos
     if country: e['nat'] = country
     pt = d.get('primaryTeam') or {}
+    if not pt.get('teamId') and 'club' not in e: e['noclub'] = True
     if pt.get('teamId') and 'club' not in e:
         tid = pt['teamId']
         if tid in club_of_fm: e['club'] = club_of_fm[tid]
@@ -210,7 +211,13 @@ def find_existing(e):
         if e.get('dob') and p.get('dob') == e['dob']: s_ += 0.25
         elif e.get('dob') and p.get('dob') and p['dob'][:4] != e['dob'][:4] and not p['dob'].endswith('-07-01'): s_ -= 0.2
         if s_ > bs: best, bs = p, s_
-    return best if bs >= 0.9 else None
+    if best is not None and bs >= 0.9: return best
+    # FotMob often files an Iran-eligible player under his other country (born and raised abroad). He is
+    # still the same man as the record we hold: same birth date and the same name.
+    if e.get('nat') != 'IRN' and e.get('dob'):
+        for p in iranians:
+            if p.get('dob') == e['dob'] and sim(n, norm(p['name'])) >= 0.82: return p
+    return None
 patches, players, skipped = {}, [], collections.Counter()
 photos_path = os.path.join(ROOT, 'data/overrides/photos.json'); photos = json.load(open(photos_path))
 os.makedirs(os.path.join(ROOT, 'public/faces/fm'), exist_ok=True)
@@ -232,6 +239,7 @@ for e in fm.values():
         if e.get('height'): patch['heightCm'] = e['height']
         if e.get('foot'): patch['foot'] = e['foot']
         if e.get('club') and e['club'] != ex.get('club'): patch['club'] = e['club']
+        elif e.get('noclub') and ex.get('club'): patch['club'] = None  # FotMob has him without a club: a free agent
         if e.get('value'): patch['valueEur'] = int(e['value'])
         if e.get('num'): patch['num'] = e['num']
         if patch: patches[ex['id']] = patch
