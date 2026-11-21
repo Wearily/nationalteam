@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { fmtDay, fmtDow } from './sim/core/date'
 import { teamName } from './sim/intl/select'
 import { LEVEL_NAME, type Level } from './sim/world/types'
-import { clearSave, loadSaved, useGame, type Route } from './ui/store'
+import { importSave, savedSlots, shelveSave, useGame, type Route, type Slot } from './ui/store'
 import { Home } from './ui/screens/Home'
 import { Inbox } from './ui/screens/Inbox'
 import { Pool } from './ui/screens/Pool'
@@ -30,8 +30,15 @@ function Mark({ size = 38 }: { size?: number }) {
 function Start() {
   const { newGame, resume, busy } = useGame()
   const [name, setName] = useState('')
-  const [hasSave, setHasSave] = useState(false)
-  useEffect(() => { void loadSaved().then((w) => setHasSave(!!w)) }, [])
+  const [slots, setSlots] = useState<{ slot: Slot; day: number; name: string }[]>([])
+  const [err, setErr] = useState<string | null>(null)
+  const [confirmNew, setConfirmNew] = useState(false)
+  useEffect(() => { void savedSlots().then(setSlots).catch((e) => setErr(`The browser would not open the saved careers: ${(e as Error).message}`)) }, [])
+  const hasSave = slots.some((s) => s.slot === 'main')
+  const others = slots.filter((s) => s.slot !== 'main')
+  const open = (slot: Slot) => { setErr(null); resume(slot).then((ok) => { if (!ok) setErr('That save could not be found.') }).catch((e) => setErr(`This save could not be opened (${(e as Error).message}). It has not been changed or deleted: tell the developer what this says.`)) }
+  const start = async () => { if (hasSave) await shelveSave(); await newGame(name.trim()) }
+  const label = (s: { day: number; name: string }) => `${s.name} · ${fmtDay(s.day)}`
   return (
     <div className="start">
       <div className="start-card">
@@ -39,12 +46,16 @@ function Start() {
         <h1>Team Melli<br />Manager</h1>
         <p className="muted" style={{ fontSize: 16, margin: '0 0 26px' }}>Run Iran's football federation. Hire the coaches, shape every national team from the under-15s to the seniors, and chase the Asian Cup and the World Cup.</p>
         <div className="col" style={{ gap: 12 }}>
-          {hasSave && <button className="btn primary go" onClick={() => void resume()}>Continue career <ChevronRight /></button>}
+          {hasSave && <button className="btn primary go" onClick={() => open('main')}>Continue career <ChevronRight /></button>}
+          {hasSave && <span className="faint" style={{ fontSize: 12.5, marginTop: -6 }}>{label(slots.find((s) => s.slot === 'main')!)}</span>}
+          {others.map((s) => <button key={s.slot} className="btn" onClick={() => open(s.slot)}>{s.slot === 'backup' ? 'Open backup copy' : 'Open previous career'} <span className="faint" style={{ marginLeft: 8 }}>{label(s)}</span></button>)}
+          {err && <div className="pill red" style={{ height: 'auto', padding: '8px 12px', whiteSpace: 'normal', borderRadius: 12 }}>{err}</div>}
           <div className="row">
             <input className="input grow" style={{ height: 42 }} placeholder="Your name" value={name} maxLength={28} onChange={(e) => setName(e.target.value)} />
-            <button className={`btn go ${hasSave ? '' : 'primary'}`} disabled={!!busy || !name.trim()} onClick={() => void (async () => { if (hasSave) await clearSave(); await newGame(name.trim()) })()}>{busy ? <span className="spinner" /> : 'New career'}</button>
+            <button className={`btn go ${hasSave ? '' : 'primary'}`} disabled={!!busy || !name.trim()} onClick={() => (hasSave && !confirmNew ? setConfirmNew(true) : void start())}>{busy ? <span className="spinner" /> : hasSave && confirmNew ? 'Yes, start new' : 'New career'}</button>
           </div>
-          <span className="faint" style={{ fontSize: 13 }}>Starts 18 November 2026, with a year to build towards the Asian Cup in Saudi Arabia.{hasSave ? ' Starting a new career replaces the saved one.' : ''}</span>
+          <span className="faint" style={{ fontSize: 13 }}>Starts 18 November 2026, with a year to build towards the Asian Cup in Saudi Arabia.{hasSave ? (confirmNew ? ' Press again to confirm. Your current career is kept as “previous career” and can be reopened from here.' : ' A new career replaces the current one, which is kept as “previous career”.') : ''}</span>
+          <label className="faint" style={{ fontSize: 13, cursor: 'pointer', textDecoration: 'underline' }}>Load a career from a file<input type="file" accept=".json,application/json" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (f) importSave(f).then((w) => resume('main', w)).catch((x) => setErr((x as Error).message)) }} /></label>
         </div>
       </div>
     </div>

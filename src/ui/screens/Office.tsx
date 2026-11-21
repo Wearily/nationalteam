@@ -3,7 +3,7 @@ import { fmtDay, ymd } from '../../sim/core/date'
 import { SCOUT_SCOPES, type ScoutScope, type World } from '../../sim/world/state'
 import { LEVEL_NAME, LEVELS, type Level, type Staff as StaffT } from '../../sim/world/types'
 import { Empty, Flag, Meter, money, tone } from '../bits'
-import { useGame } from '../store'
+import { exportSave, useGame } from '../store'
 
 const Skill = ({ v }: { v: number }) => <span className="num" style={{ fontWeight: 680, color: v >= 15 ? '#86efac' : v >= 11 ? '#fde047' : '#fdba74' }}>{v}</span>
 const age = (day: number, dob: number) => Math.floor((day - dob) / 365.25)
@@ -122,6 +122,7 @@ export function Federation() {
   )
   return (
     <div className="page-inner">
+      <div className="card row"><div className="grow"><b>Saved career</b><div className="faint" style={{ fontSize: 12.5 }}>The game saves in this browser after every step and keeps a backup copy. Browsers can clear that storage, so download a copy now and then; it can be loaded back from the start screen.</div></div><button className="btn" onClick={() => exportSave(world)}>Download save file</button></div>
       <div className="grid g4">
         <div className="card kpi"><span className="eyebrow">Balance</span><b>{money(f.budget)}</b><small>{f.income >= 0 ? '+' : ''}{money(f.income)} last month</small></div>
         {([['Board confidence', f.board], ['Supporters', f.fans], ['Media', f.media]] as const).map(([k, v]) => <div key={k} className="card kpi"><span className="eyebrow">{k}</span><b>{Math.round(v)}</b><div style={{ marginTop: 10 }}><Meter v={v} tone={tone(v)} /></div></div>)}
