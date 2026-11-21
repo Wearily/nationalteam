@@ -116,6 +116,8 @@ export interface World {
   history: { year: number; comp: string; level: Level; result: string }[]
   /** Last calendar year whose competitive fixtures have been drawn up; friendlies can only be booked up to here. */
   plannedThrough?: number
+  /** Names from the international-retirement list already applied to this career (so a player talked into returning is not retired again on load). */
+  intlRetiredSeen?: string[]
   /** Short football news feed shown on the overview. */
   news?: NewsItem[]
 }

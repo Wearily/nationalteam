@@ -1,6 +1,7 @@
 import { ageOn, parseDay, toDay, type Day } from '../core/date'
 import { Rng, clamp, hashStr } from '../core/rng'
 import { nameKey, type Pos, type RawData, type RawPlayer } from '../data/raw'
+import intlRetiredList from '../../../data/overrides/intl-retired.json'
 import attrFixes from '../../../data/overrides/attributes.json'
 import coachProfiles from '../../../data/overrides/coaches.json'
 import { A, fitToOverall, generateAttrs, overallAt } from '../ratings/attributes'
@@ -76,6 +77,8 @@ const SQUAD_SHAPE: Pos[] = ['GK', 'GK', 'GK', 'RB', 'RB', 'CB', 'CB', 'CB', 'CB'
 const YOUTH_SHAPE: Pos[] = ['GK', 'CB', 'CB', 'RB', 'LB', 'DM', 'CM', 'CM', 'AM', 'RW', 'LW', 'ST', 'ST', 'GK', 'CB', 'CM']
 
 const ATTR_FIX = new Map<string, Record<string, number>>(Object.entries(attrFixes as unknown as Record<string, Record<string, number> | string>).filter(([, v]) => typeof v === 'object').map(([k, v]) => [nameKey(k), v as Record<string, number>]))
+/** Real players who have retired from international football (data/overrides/intl-retired.json). */
+export const INTL_RETIRED = new Set((intlRetiredList as { names: string[] }).names.map(nameKey))
 type CoachProfile = { formation?: string; abroadBias?: number; mentality?: number }
 const COACHES = new Map<string, CoachProfile>(Object.entries(coachProfiles as unknown as Record<string, CoachProfile | string>).filter(([, v]) => typeof v === 'object').map(([k, v]) => [nameKey(k), v as CoachProfile]))
 /** Hand-set style for a real coach (data/overrides/coaches.json), if he has one. */
@@ -127,6 +130,7 @@ export function buildWorld(raw: RawData, seed: number, managerName: string, over
   const w: World = {
     version: 1, seed, rng: 0, day: today, startDay: today, season: 2026, managerName, players: [], clubs, leagues, nations, staff: [], comps: [], fixtures: [],
     teams: {} as World['teams'],
+    intlRetiredSeen: [...INTL_RETIRED],
     fed: { budget: 14_000_000, income: 0, board: 62, fans: 60, media: 55, pathway: 38, scoutBudget: 600_000, youthInvest: 800_000, ledger: [] },
     inbox: [], reports: [], pending: [], natSquads: {}, nextId: { fixture: 0, msg: 0, report: 0 }, rankHist: [], camps: [], scouts: [], approaches: {}, history: [],
   }
@@ -173,6 +177,7 @@ export function buildWorld(raw: RawData, seed: number, managerName: string, over
     })
     if (r.valueEur) { p.value = r.valueEur; p.valueHist = [[today, p.value]] }
     if (approx) p.dobApprox = true
+    if (INTL_RETIRED.has(nameKey(r.name))) p.intlRetired = true
     // hand-set attributes: fix those, let the rest settle around the overall, then fix them again
     const locks = ATTR_FIX.get(nameKey(r.name))
     if (locks) {
