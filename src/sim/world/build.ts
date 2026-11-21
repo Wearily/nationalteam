@@ -164,7 +164,7 @@ export function buildWorld(raw: RawData, seed: number, managerName: string, over
     const ovr = fixed ? fixed[0] : estimate(r, club, age, prng)
     const p = makePlayer(w, prng, {
       name: r.name, dob, nat: r.nat.filter((n) => nations[n]), pos: r.pos, clubId: club?.id ?? null, ovr, today,
-      leagueStrength: club ? leagues[club.leagueId].strength : 45, real: true, rid: r.id, heightCm: r.heightCm, foot: r.foot, pot: fixed ? Math.max(fixed[0], fixed[1]) : undefined,
+      leagueStrength: club ? leagues[club.leagueId].strength : 45, real: true, rid: r.id, heightCm: r.heightCm, foot: r.foot, pot: fixed ? (age >= 29 ? fixed[0] : Math.max(fixed[0], fixed[1])) : undefined,
     })
     if (r.valueEur) { p.value = r.valueEur; p.valueHist = [[today, p.value]] }
     if (approx) p.dobApprox = true

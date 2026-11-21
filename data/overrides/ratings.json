@@ -1,8 +1,8 @@
 {
  "_note": "Hand-set overall/potential for well-known players, matched by name (case-insensitive). Everything else is estimated from club, league, age and caps.",
  "Mehdi Taremi": [
-  80,
-  80
+  78,
+  78
  ],
  "Mohammadjavad Hosseinnejad": [
   71,
@@ -13,16 +13,16 @@
   81
  ],
  "Sardar Azmoun": [
-  77,
-  77
+  76,
+  76
  ],
  "Alireza Jahanbakhsh": [
   68,
   68
  ],
  "Alireza Beiranvand": [
-  76,
-  76
+  75,
+  75
  ],
  "Saman Ghoddos": [
   73,
@@ -41,48 +41,48 @@
   71
  ],
  "Majid Hosseini": [
-  73,
-  73
+  70,
+  70
  ],
  "Mohammad Hossein Kanaanizadegan": [
-  73,
-  73
+  71,
+  71
  ],
  "Rouzbeh Cheshmi": [
-  72,
-  72
+  71,
+  71
  ],
  "Ramin Rezaeian": [
-  73,
-  73
+  67,
+  67
  ],
  "Omid Noorafkan": [
-  72,
-  72
+  70,
+  70
  ],
  "Mehdi Ghayedi": [
-  74,
+  75,
   76
  ],
  "Mohammad Mohebi": [
+  73,
+  74
+ ],
+ "Amirhossein Hosseinzadeh": [
   75,
   77
  ],
- "Amirhossein Hosseinzadeh": [
-  73,
-  76
- ],
  "Shojae Khalilzadeh": [
-  72,
-  72
+  70,
+  70
  ],
  "Payam Niazmand": [
   72,
-  73
+  72
  ],
  "Hossein Hosseini": [
-  73,
-  73
+  72,
+  72
  ],
  "Ali Gholizadeh": [
   74,
@@ -93,8 +93,8 @@
   81
  ],
  "Ali Alipour": [
-  72,
-  72
+  71,
+  71
  ],
  "Shahriar Moghanlou": [
   71,
@@ -105,12 +105,12 @@
   73
  ],
  "Aria Yousefi": [
-  71,
+  72,
   77
  ],
  "Mohammad Ghorbani": [
   71,
-  76
+  74
  ],
  "Ali Nemati": [
   71,
@@ -121,7 +121,7 @@
   73
  ],
  "Kasra Taheri": [
-  66,
+  67,
   80
  ],
  "Amirhossein Mahmoudi": [
@@ -129,8 +129,8 @@
   78
  ],
  "Alireza Koushki": [
-  69,
-  76
+  67,
+  69
  ],
  "Omid Ebrahimi": [
   69,
@@ -141,12 +141,12 @@
   70
  ],
  "Morteza Pouraliganji": [
-  71,
-  71
+  68,
+  68
  ],
  "Sadegh Moharrami": [
-  71,
-  71
+  70,
+  70
  ],
  "Hossein Abarghouei": [
   70,
@@ -161,8 +161,8 @@
   72
  ],
  "Yasin Salmani": [
-  70,
-  76
+  65,
+  70
  ],
  "Mohammad Amin Hazbavi": [
   70,
@@ -173,8 +173,8 @@
   74
  ],
  "Abolfazl Jalali": [
-  71,
-  75
+  69,
+  69
  ],
  "Zobeir Niknafs": [
   70,
@@ -185,8 +185,8 @@
   71
  ],
  "Mahdi Torabi": [
-  72,
-  72
+  71,
+  71
  ],
  "Dennis Eckert Ayensa": [
   75,
@@ -203,5 +203,97 @@
  "Mohammad Khalifeh": [
   69,
   78
+ ],
+ "Ahmad Nourollahi": [
+  72,
+  72
+ ],
+ "Milad Kor": [
+  67,
+  73
+ ],
+ "Amir Hossein Hosseinzadeh": [
+  75,
+  77
+ ],
+ "Nader Mohammadi": [
+  65,
+  65
+ ],
+ "Mohammad Milad Sourgi": [
+  64,
+  68
+ ],
+ "David Stückler": [
+  66,
+  74
+ ],
+ "Hadi Habibinejad": [
+  68,
+  68
+ ],
+ "Amir Mohammad Razzaghinia": [
+  69,
+  78
+ ],
+ "Yasin Jorjani": [
+  66,
+  73
+ ],
+ "Amirmohammad Mahmoudi": [
+  62,
+  72
+ ],
+ "Xavi Gnaulati": [
+  63,
+  71
+ ],
+ "Behnam Teymourian": [
+  62,
+  70
+ ],
+ "Aryan Khozan": [
+  60,
+  69
+ ],
+ "Mohammad Daneshgar": [
+  70,
+  70
+ ],
+ "Mehrdad Mohammadi": [
+  68,
+  68
+ ],
+ "Mohammad Naderi": [
+  70,
+  70
+ ],
+ "Ghasem Latifi": [
+  65,
+  71
+ ],
+ "Pouria Bali Lashak": [
+  62,
+  66
+ ],
+ "Sajjad Mashhadi": [
+  61,
+  68
+ ],
+ "Taha Mohebipour": [
+  62,
+  70
+ ],
+ "Morteza Fazeli": [
+  60,
+  70
+ ],
+ "Mohammadhossein Baseri": [
+  64,
+  67
+ ],
+ "Kavian Rahmani": [
+  66,
+  77
  ]
 }

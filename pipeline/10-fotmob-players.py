@@ -61,14 +61,16 @@ iranians = [p for p in wplayers if 'IRN' in p['nat']]
 
 new_clubs, new_leagues, club_of_fm = [], [], {}
 # FotMob names that differ too much from the base data to match automatically
+NOT_THE_SAME_CLUB = {'Spartak Kostroma'}
 CLUB_ALIAS = {'Sanat Naft Abadan': 'irn-sanat-naft', 'Naft Masjed Soleyman FC': 'irn-naft-m-i-s'}
 def map_club(tid, tname, country, league_hint=None, create=True):
     """FotMob team -> game club id (existing by name within country, else a new club)."""
     if tid in club_of_fm: return club_of_fm[tid]
     known = CLUB_ALIAS.get(tname)
+    distinct = tname in NOT_THE_SAME_CLUB  # shares a word with a bigger club but is a different one
     if known and any(c['id'] == known for c in clubs): club_of_fm[tid] = known; return known
     best, bs = None, 0
-    for c in by_country.get(country, []):
+    for c in ([] if distinct else by_country.get(country, [])):
         s_ = max(sim(norm(c['name']), norm(tname)), sim(norm(c.get('short') or c['name']), norm(tname)))
         if c['league'].startswith('other-'): s_ -= 0.03
         if s_ > bs: best, bs = c, s_
@@ -77,7 +79,7 @@ def map_club(tid, tname, country, league_hint=None, create=True):
     STOP = {'fc', 'sc', 'club', 'cf', 'fk', 'ac'}
     ft = [t for t in norm(tname).split() if t not in STOP]
     sub = []
-    for c in by_country.get(country, []):
+    for c in ([] if distinct else by_country.get(country, [])):
         ct = [t for t in norm(c.get('short') or c['name']).split() if t not in STOP] or norm(c['name']).split()
         if ct and ft and (set(ct) <= set(ft) or set(ft) <= set(ct)) and ft[0] == ct[0]: sub.append((len(set(ct) & set(ft)), not c['league'].startswith('other-'), c))
     if sub:
