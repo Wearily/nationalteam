@@ -134,8 +134,11 @@ export function buildWorld(raw: RawData, seed: number, managerName: string, over
   // ── real players ──
   const estimate = (r: RawPlayer, club: Club | undefined, age: number, prng: Rng): number => {
     const lg = club ? leagues[club.leagueId] : undefined
-    let est = club && lg ? clubBase(lg.strength, club.rep) - 1.5 : 56
-    est += prng.normal(0, 3.2)
+    const level = club && lg ? clubBase(lg.strength, club.rep) : 57.5
+    // with caps or a market value there is something to go on; with neither, assume a squad player:
+    // a few points under his club's level and never above it
+    const evidence = (r.caps ?? 0) > 0 || (r.valueEur ?? 0) > 20_000
+    let est = evidence ? level - 1.5 + prng.normal(0, 3.2) : Math.min(level, level - 4 + prng.normal(0, 2.2))
     if (age < 22) est -= (22 - age) * 2.3
     if (age > 32) est -= (age - 32) * 1.4
     const nat = nations[r.nat[0]]
