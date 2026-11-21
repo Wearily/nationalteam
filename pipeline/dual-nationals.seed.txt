@@ -3,3 +3,27 @@
 Aiden Hezarkhani | USA
 Arman Nahany | NED
 Xavi Gnaulati | USA
+# From the Transfermarkt list of Iranian dual nationals (uncapped at senior level for the other nation).
+# Optional fallback fields, used only when FotMob does not have the player:
+#   Name | code | date of birth | positions | club | country of club | value in euros | height cm
+Elis Bishesari | SWE | 2005-05-19 | GK | IFK Göteborg | SWE | 1300000 | 185
+David Stückler | DEN | 2004-10-07 | ST | US Cremonese | ITA | 500000 | 188
+Kavian Rahmani | AUS | 2006-12-29 | AM | Melbourne City FC | AUS | 450000 | 183
+Saman Jalaei | DEN | 2006-06-04 | LW | Hillerød Fodbold | DEN | 400000 | 170
+Eisa Palangi | QAT | 1999-02-21 | LB | Qatar SC | QAT | 325000 | 178
+Arash Motaraghebjafarpour | SWE | 2003-03-19 | RB | IFK Värnamo | SWE | 275000 | 178
+Elias Vali Fard | GER | 2008-01-15 | CB | Borussia Mönchengladbach II | GER | 250000 | 188
+Rassa Rahmani | SWE | 1999-12-14 | CB | SCR Altach | AUT | 250000 | 185
+Hadi Tabasideh | QAT | 2001-09-14 | RW | Al-Sailiya SC | QAT | 225000 |
+Adam Kiani | SWE | 2003-03-18 | CM | Sandvikens IF | SWE | 225000 |
+Paya Pichkah | SWE | 2000-03-21 | CM | Bryne FK | NOR | 225000 | 191
+Ebrahim Farahnak | GER | 1998-01-19 | CB | Würzburger Kickers | GER | 200000 | 193
+Ali Karami | QAT | 1999-02-26 | RB | Lusail SC | QAT | 175000 | 170
+Milad Nejad | GER | 2004-06-29 | AM | Eintracht Norderstedt | GER | 150000 | 183
+Kasra Ghawilu | GER | 1999-02-11 | RW | SV Meppen | GER | 150000 | 183
+Sami Keshavarz | CAN | 2006-08-18 | CM | Pacific FC | CAN | 125000 | 170
+Rafi Wolters | NED | 2007-04-21 | ST | FC Den Bosch | NED | 100000 | 188
+Farbod Samadian | CRC | 2005-02-06 | CB | LD Alajuelense | CRC | 100000 | 188
+Faisal Azadi | QAT | 2001-01-13 | CM | Al-Markhiya SC | QAT | 100000 | 170
+Nasir Baksh | QAT | 1999-01-27 | RB | Qatar SC | QAT | 100000 | 170
+Kahveh Zahiroleslam | USA

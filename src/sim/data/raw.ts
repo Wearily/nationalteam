@@ -110,6 +110,8 @@ export interface RawExtra {
   clubs: RawClub[]
   leagues: RawLeague[]
   clubLeague?: ClubLeagues
+  /** Ids of base records that duplicate another player and should be left out. */
+  drop?: string[]
 }
 /** Name comparison that ignores case, accents, spaces and hyphens: "Amir Hossein" is "Amirhossein". */
 export const nameKey = (s: string) => s.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z]/g, '')
@@ -124,6 +126,6 @@ export function mergeExtra(raw: RawData, extra?: RawExtra | null): RawData {
     ...raw,
     leagues: [...raw.leagues, ...extra.leagues.filter((l) => !haveL.has(l.id))],
     clubs: [...raw.clubs, ...extra.clubs.filter((c) => !haveC.has(c.id))].map((c) => (extra.clubLeague?.[c.id] ? { ...c, leagueName: extra.clubLeague[c.id] } : c)),
-    players: [...raw.players.map((p) => (extra.patches[p.id] ? { ...p, ...extra.patches[p.id] } : p)), ...extra.players.filter((p) => !haveP.has(p.id))],
+    players: [...raw.players.filter((p) => !extra.drop?.includes(p.id)).map((p) => (extra.patches[p.id] ? { ...p, ...extra.patches[p.id] } : p)), ...extra.players.filter((p) => !haveP.has(p.id))],
   }
 }

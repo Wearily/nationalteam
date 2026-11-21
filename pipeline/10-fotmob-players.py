@@ -150,11 +150,15 @@ for line in open(os.path.join(ROOT, 'pipeline/iranians-abroad.seed.txt')):
     line = line.strip()
     if line and not line.startswith('#'): lookups[line] = None
 duals = {}
+dual_seed = {}
 for line in open(os.path.join(ROOT, 'pipeline/dual-nationals.seed.txt')):
     line = line.strip()
     if line and not line.startswith('#') and '|' in line:
-        nm, code = [x.strip() for x in line.split('|')]
-        if code in nations: duals[nm] = code; lookups[nm] = None
+        parts = [x.strip() for x in line.split('|')]
+        nm, code = parts[0], parts[1]
+        if code in nations:
+            duals[nm] = code; lookups[nm] = None
+            if len(parts) >= 6: dual_seed[nm] = dict(zip(['dob', 'pos', 'club', 'clubCountry', 'value', 'height'], parts[2:] + [''] * 6))
 dual_ids = {}
 iran_club_ids = {c['id'] for c in world['clubs'] if c['country'] == 'IRN'}
 for p in iranians:
@@ -200,6 +204,38 @@ def player(pid):
 for pid in sorted(want): player(pid)
 for pid, code in dual_ids.items():
     if pid in fm: fm[pid]['nat'] = code; fm[pid]['dual'] = True
+# dual nationals FotMob does not have (or has a namesake of): use the details given in the seed file
+def seed_club(name, country):
+    if not name: return None
+    for grp in search(name):
+        for it in grp.get('suggestions', []):
+            if it.get('type') == 'team' and sim(norm(it.get('name', '')), norm(name)) >= 0.8: return map_club(int(it['id']), it['name'], country)
+    for c in by_country.get(country, []):
+        if sim(norm(c['name']), norm(name)) >= 0.85: return c['id']
+    lid = f'other-{country.lower()}'
+    if lid not in leagues:
+        leagues[lid] = {'id': lid, 'name': f'{country} — other clubs', 'country': country, 'tier': 1, 'strength': 50, 'startMonth': 8}; new_leagues.append(leagues[lid])
+    c = {'id': 'tm-' + re.sub(r'[^a-z0-9]+', '-', norm(name)).strip('-'), 'name': name, 'country': country, 'league': lid, 'rep': leagues[lid]['strength']}
+    clubs.append(c); by_country[country].append(c); new_clubs.append(c)
+    return c['id']
+found = {}
+for pid, e in list(fm.items()):
+    if e.get('dual'): found[norm(e['name'])] = pid
+seeded = []
+for nm, sd in dual_seed.items():
+    pid = next((v for k, v in found.items() if sim(k, norm(nm)) >= 0.86), None)
+    if pid is not None and sd['dob'] and fm[pid].get('dob') and fm[pid]['dob'] != sd['dob']:
+        del fm[pid]; pid = None  # a namesake
+    if pid is not None:
+        if sd['value'] and not fm[pid].get('value'): fm[pid]['value'] = int(sd['value'])
+        continue
+    if not sd['dob'] or not sd['pos'] or sd['clubCountry'] not in nations: continue
+    key = 'seed-' + re.sub(r'[^a-z0-9]+', '-', norm(nm))
+    e = {'id': key, 'name': nm, 'dob': sd['dob'], 'pos': [x for x in sd['pos'].split(',') if x], 'nat': duals[nm], 'dual': True, 'club': seed_club(sd['club'], sd['clubCountry'])}
+    if sd['value']: e['value'] = int(sd['value'])
+    if sd['height']: e['height'] = int(sd['height'])
+    fm[key] = e; seeded.append(nm)
+print('dual nationals taken from the seed file (not on FotMob):', seeded)
 print('looked up individually:', len(want))
 
 # 4. match to existing records -> patches, else new players
@@ -212,6 +248,9 @@ def find_existing(e):
         elif e.get('dob') and p.get('dob') and p['dob'][:4] != e['dob'][:4] and not p['dob'].endswith('-07-01'): s_ -= 0.2
         if s_ > bs: best, bs = p, s_
     if best is not None and bs >= 0.9: return best
+    if e.get('club'):
+        for p in iranians:
+            if p.get('club') == e['club'] and squash(p['name']) == squash(e['name']): return p
     # same birth date at the same club, with a surname in common under a different spelling or a longer
     # form of the name ("Hossein Kanaani" / "Mohammad Hossein Kanaanizadegan"): one man, not two
     if e.get('dob') and e.get('club'):
@@ -237,7 +276,8 @@ def face(pid_game, fid):
 seen = set()
 for e in fm.values():
     if not e.get('nat'): skipped['no nationality'] += 1; continue
-    ex = None if e.get('dual') else find_existing(e)
+    ex = find_existing(e)
+    if ex and e.get('dual') and ex['nat'][0] == 'IRN' and (ex.get('caps') or 0) > 0: e.pop('dual')  # already plays for Iran
     if ex:
         if ex['id'] in seen: continue
         seen.add(ex['id'])
@@ -250,6 +290,7 @@ for e in fm.values():
         elif e.get('noclub') and ex.get('club') and e.get('dob') and e['dob'] == ex.get('dob'): patch['club'] = None  # FotMob has him without a club: a free agent
         if e.get('value'): patch['valueEur'] = int(e['value'])
         if e.get('num'): patch['num'] = e['num']
+        if e.get('dual'): patch['nat'] = [e['nat'], 'IRN']; patch['born'] = e['nat']
         if patch: patches[ex['id']] = patch
         face(ex['id'], e['id'])
         continue
@@ -263,6 +304,58 @@ for e in fm.values():
     if e.get('num'): rec['num'] = e['num']
     players.append(rec); face(rec['id'], e['id'])
 json.dump(photos, open(photos_path, 'w'), indent=0, sort_keys=True)
+# reference list (Transfermarkt, supplied by hand): value, club, main position, birth date and caps
+tm_rows, tm_log = [], collections.Counter()
+tm_path = os.path.join(ROOT, 'data/overrides/transfermarkt.txt')
+if os.path.exists(tm_path):
+    for line in open(tm_path):
+        line = line.strip()
+        if not line or line.startswith('#'): continue
+        f_ = [x.strip() for x in line.split('|')] + [''] * 7
+        tm_rows.append(dict(name=f_[0], dob=f_[1], pos=f_[2], club=f_[3], country=f_[4] or 'IRN', value=f_[5], caps=f_[6]))
+def tm_find(row):
+    n = norm(row['name']); cands = []
+    for kind, pool in (('w', iranians), ('f', [q for q in players if 'IRN' in q['nat']])):
+        for q in pool:
+            dob = (patches.get(q['id'], {}).get('dob') if kind == 'w' else None) or q.get('dob')
+            s_ = sim(n, norm(q['name']))
+            toks = set(t for t in n.split() if len(t) >= 4); qt = set(t for t in norm(q['name']).split() if len(t) >= 4)
+            share = any(x.startswith(y) or y.startswith(x) or sim(x, y) >= 0.8 for x in toks for y in qt)
+            first = n.split()[0]; qall = norm(q['name']).split()
+            given = any(sim(first, y) >= 0.75 or first in y or y in first for y in qall if len(y) >= 3)  # twins share a birth date and a surname
+            if dob == row['dob'] and (s_ >= 0.55 or share) and (given or s_ >= 0.92): cands.append((s_ + 1, kind, q))
+            elif s_ >= 0.93 and (not dob or dob[:4] == row['dob'][:4] or dob.endswith('-07-01')): cands.append((s_, kind, q))
+            elif squash(q['name']) == squash(row['name']) and row['club'] not in ('', '-') and norm(row['club']).split()[0] in norm(q.get('club') or ''): cands.append((0.95, kind, q))
+    cands.sort(key=lambda x: -x[0])
+    return cands[0][1:] if cands else (None, None)
+def tm_club(row):
+    if row['club'] in ('', '-'): return None
+    best, bs = None, 0
+    for c in by_country.get(row['country'], []):
+        s_ = max(sim(norm(c['name']), norm(row['club'])), sim(norm(c.get('short') or c['name']), norm(row['club'])))
+        if norm(row['club']) in norm(c['name']) or norm(c['name']) in norm(row['club']): s_ = max(s_, 0.9)
+        if c['league'].startswith('other-'): s_ -= 0.03
+        if s_ > bs: best, bs = c, s_
+    return best['id'] if best and bs >= 0.8 else seed_club(row['club'], row['country'])
+for row in tm_rows:
+    kind, q = tm_find(row)
+    club = tm_club(row)
+    if q is None:
+        rec = {'id': 'tm:' + re.sub(r'[^a-z0-9]+', '-', norm(row['name'])), 'name': row['name'], 'dob': row['dob'], 'nat': ['IRN'], 'pos': [row['pos']], 'club': club, 'src': 'transfermarkt', 'valueEur': int(row['value'])}
+        if row['caps']: rec['caps'] = int(row['caps'])
+        players.append(rec); tm_log['added'] += 1; print('  reference list: added', row['name'])
+        continue
+    tgt = patches.setdefault(q['id'], {}) if kind == 'w' else q
+    cur = {**q, **tgt} if kind == 'w' else q
+    tgt['valueEur'] = int(row['value'])
+    if cur.get('dob') != row['dob']: tgt['dob'] = row['dob']; tm_log['birth date corrected'] += 1
+    pos = [row['pos']] + [x for x in (cur.get('pos') or []) if x != row['pos']]
+    if pos != cur.get('pos'): tgt['pos'] = pos[:4]; tm_log['main position changed'] += 1
+    if club != cur.get('club'): tgt['club'] = club; tm_log['club changed'] += 1; print('  reference list: club', q['name'], cur.get('club'), '->', club)
+    if row['caps'] and int(row['caps']) > int(cur.get('caps') or 0): tgt['caps'] = int(row['caps'])
+    tm_log['matched'] += 1
+print('reference list:', dict(tm_log))
+
 # real league names for clubs the game files under a country's catch-all bucket
 club_by_id = {c['id']: c for c in clubs}
 used = {p.get('club') for p in players} | {pt.get('club') for pt in patches.values()} | {p.get('club') for p in iranians}
@@ -274,7 +367,19 @@ for tid, cid in club_of_fm.items():
     ln = (td.get('details') or {}).get('primaryLeagueName')
     if ln: club_league[cid] = ln
 print('league names found for', len(club_league), 'clubs in catch-all buckets')
-json.dump({'version': 1, 'players': players, 'patches': patches, 'clubs': new_clubs, 'leagues': new_leagues, 'clubLeague': club_league}, open(os.path.join(ROOT, 'public/data/fotmob.json'), 'w'), separators=(',', ':'))
+# the base data sometimes lists one man twice (a stale record with no club or a slightly different birth date):
+# keep the fuller record and drop the other
+drop = []
+groups = collections.defaultdict(list)
+for q in iranians: groups[squash(q['name'])].append({**q, **patches.get(q['id'], {})})
+for g_ in groups.values():
+    if len(g_) < 2: continue
+    g_.sort(key=lambda q: (-(q.get('caps') or 0), q.get('club') is None, not q['id'].startswith('x:')))
+    keep = g_[0]
+    for q in g_[1:]:
+        if q.get('club') == keep.get('club') or (q.get('club') is None and not q.get('caps')): drop.append(q['id']); patches.pop(q['id'], None)
+print('duplicate base records dropped:', len(drop))
+json.dump({'version': 1, 'players': players, 'patches': patches, 'clubs': new_clubs, 'leagues': new_leagues, 'clubLeague': club_league, 'drop': drop}, open(os.path.join(ROOT, 'public/data/fotmob.json'), 'w'), separators=(',', ':'))
 ir_new = [p for p in players if p['nat'][0] == 'IRN']
 abroad = collections.Counter()
 cc = {c['id']: c['country'] for c in clubs}
