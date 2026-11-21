@@ -1,6 +1,7 @@
 import { ageOn, parseDay, toDay, type Day } from '../core/date'
 import { Rng, clamp, hashStr } from '../core/rng'
 import { nameKey, type Pos, type RawData, type RawPlayer } from '../data/raw'
+import playerFixes from '../../../data/overrides/player-fixes.json'
 import intlRetiredList from '../../../data/overrides/intl-retired.json'
 import attrFixes from '../../../data/overrides/attributes.json'
 import coachProfiles from '../../../data/overrides/coaches.json'
@@ -77,6 +78,9 @@ const SQUAD_SHAPE: Pos[] = ['GK', 'GK', 'GK', 'RB', 'RB', 'CB', 'CB', 'CB', 'CB'
 const YOUTH_SHAPE: Pos[] = ['GK', 'CB', 'CB', 'RB', 'LB', 'DM', 'CM', 'CM', 'AM', 'RW', 'LW', 'ST', 'ST', 'GK', 'CB', 'CM']
 
 const ATTR_FIX = new Map<string, Record<string, number>>(Object.entries(attrFixes as unknown as Record<string, Record<string, number> | string>).filter(([, v]) => typeof v === 'object').map(([k, v]) => [nameKey(k), v as Record<string, number>]))
+type PlayerFix = { nat?: string[]; born?: string; heightCm?: number; foot?: 'L' | 'R' | 'B' }
+/** Hand corrections to real players' basic facts (data/overrides/player-fixes.json). */
+export const PLAYER_FIXES = new Map<string, PlayerFix>(Object.entries(playerFixes as unknown as Record<string, PlayerFix | string>).filter(([, v]) => typeof v === 'object').map(([k, v]) => [nameKey(k), v as PlayerFix]))
 /** Real players who have retired from international football (data/overrides/intl-retired.json). */
 export const INTL_RETIRED = new Set((intlRetiredList as { names: string[] }).names.map(nameKey))
 type CoachProfile = { formation?: string; abroadBias?: number; mentality?: number }
@@ -159,6 +163,8 @@ export function buildWorld(raw: RawData, seed: number, managerName: string, over
     return est
   }
   for (const r of raw.players) {
+    const fix = PLAYER_FIXES.get(nameKey(r.name))
+    if (fix) Object.assign(r, fix)
     const pf = posFix.get(nameKey(r.name))
     if (pf) r.pos = pf
     if (!r.dob || !r.pos?.length || !r.nat?.length || !nations[r.nat[0]]) continue

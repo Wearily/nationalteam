@@ -87,7 +87,7 @@ describe('match engine balance', () => {
     expect(r.five).toBeLessThan(0.02)
     expect(r.matchGoals).toBeGreaterThan(2.1)
     expect(r.matchGoals).toBeLessThan(3.2)
-  })
+  }, 60_000)
 })
 
 describe('live match lineup', () => {

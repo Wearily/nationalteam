@@ -14,7 +14,7 @@ import { MatchSim } from './match/engine'
 import { expectedGoals } from './match/quick'
 import type { Tactic } from './match/tactics'
 import type { Frame, MatchReport, MatchSnapshot, MEvent, ShotRec } from './match/types'
-import { buildWorld, coachProfile, INTL_RETIRED } from './world/build'
+import { buildWorld, coachProfile, INTL_RETIRED, PLAYER_FIXES } from './world/build'
 import { buildIndex, type Camp, type Index, type Message, type NewsItem, type ScoutScope, type World } from './world/state'
 import { LEVEL_NAME, LEVELS, natRef, parseRef, type Fixture, type Level, type Player, type Pos } from './world/types'
 
@@ -70,6 +70,7 @@ export class Game {
    */
   applyPositionFixes(extra: RawExtra | null | undefined, positions: Record<string, Pos[] | string>): number {
     let n = 0
+    let changedNat = false
     const byName = new Map(Object.entries(positions).map(([k, v]) => [nameKey(k), v]))
     // players added to the international-retirement list since this career began
     const seen = new Set(this.w.intlRetiredSeen ?? [])
@@ -80,6 +81,14 @@ export class Game {
       for (const t of Object.values(this.w.teams)) t.squad = t.squad.filter((id) => id !== p.id)
     }
     this.w.intlRetiredSeen = [...INTL_RETIRED]
+    // hand corrections to nationality reach careers already under way
+    for (const p of this.w.players) {
+      const fix = p.real ? PLAYER_FIXES.get(nameKey(p.name)) : undefined
+      if (!fix) continue
+      if (fix.nat) { const nat = fix.nat.filter((n) => this.w.nations[n]); if (nat.length && nat.join() !== p.nat.join()) { p.nat = nat; changedNat = true } }
+      if (fix.born) p.born = fix.born
+    }
+    if (changedNat) this.idx = buildIndex(this.w)
     // real coaches' hand-set styles also reach careers already under way
     for (const st of this.w.staff) { const prof = st.real ? coachProfile(st.name) : undefined; if (prof) Object.assign(st, prof) }
     // careers started before clubs carried their real league name pick it up here
