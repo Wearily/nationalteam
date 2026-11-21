@@ -103,7 +103,7 @@ export function buildWorld(raw: RawData, seed: number, managerName: string, over
     const rep = c.rep ?? lg.strength
     const club: Club = {
       id: clubs.length, rid: c.id, name: c.name, short: c.short ?? c.name.replace(/\b(F\.?C\.?|S\.?C\.?|Football Club|Club)\b/g, '').trim(), country: c.country,
-      leagueId: lg.id, city: c.city, stadium: c.stadium, rep, colors: c.colors ?? COLORS[hashStr(c.id) % COLORS.length], logo: c.logo,
+      leagueId: lg.id, city: c.city, stadium: c.stadium, rep, colors: c.colors ?? COLORS[hashStr(c.id) % COLORS.length], logo: c.logo, leagueName: c.leagueName,
       str: clubBase(lg.strength, rep), full: c.country === 'IRN' && !lg.virtual, academy: !!c.academy || (c.country === 'IRN' && lg.tier === 1),
     }
     clubs.push(club)

@@ -116,6 +116,8 @@ export interface Club {
   rep: number
   colors: [string, string]
   logo?: string
+  /** Name of the real league the club plays in, when the game only has a catch-all bucket for its country. */
+  leagueName?: string
   /** Team strength used by the fast engine (0–100 scale, same as player overalls). */
   str: number
   /** True when the whole squad is modelled as individuals. */

@@ -21,6 +21,14 @@ export const money = (v: number) => {
 }
 export const ageOf = (w: World, p: Player) => ageOn(p.dob, w.day)
 export const clubOf = (w: World, p: Player) => (p.clubId != null ? w.clubs[p.clubId] : null)
+/** League name to show for a player: the club's real league where known; never the internal "other clubs" bucket. */
+export function leagueLabel(w: World, p: Player): string | null {
+  if (p.clubId == null) return null
+  const c = w.clubs[p.clubId]
+  const lg = w.leagues[c.leagueId]
+  if (!lg.virtual && !lg.name.includes('other clubs')) return lg.name
+  return c.leagueName ?? `${w.nations[lg.country]?.name ?? lg.country} · league not listed`
+}
 export const leagueOf = (w: World, p: Player) => (p.clubId != null ? w.leagues[w.clubs[p.clubId].leagueId] : null)
 export const isAbroad = (w: World, p: Player) => { const c = clubOf(w, p); return !!c && c.country !== 'IRN' }
 

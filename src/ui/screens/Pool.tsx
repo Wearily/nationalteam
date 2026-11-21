@@ -5,7 +5,7 @@ import { formAvg } from '../../sim/clubs/season'
 import { ageEligible } from '../../sim/intl/select'
 import { posLine } from '../../sim/ratings/attributes'
 import { LEVEL_NAME, LEVELS, type Level, type Player } from '../../sim/world/types'
-import { clubLogo, ageOf, clubOf, Crest, Flag, FormDots, leagueOf, money, Ovr, PlayerLink, PosTag, Rating, scoutView } from '../bits'
+import { clubLogo, ageOf, clubOf, Crest, Flag, FormDots, leagueLabel, money, Ovr, PlayerLink, PosTag, Rating, scoutView } from '../bits'
 import { useGame } from '../store'
 
 type SortKey = 'ovr' | 'pot' | 'age' | 'form' | 'value' | 'caps' | 'name' | 'goals' | 'mins'
@@ -77,7 +77,6 @@ export function PoolTable({ level, selected, onToggle, height = 640, limit, over
             {items.map((vi) => {
               const p = rows[vi.index]
               const c = clubOf(w, p)
-              const lg = leagueOf(w, p)
               const sel = selected?.has(p.id)
               const inSquad = level ? LEVELS.find((l) => l !== level && w.teams[l]?.squad.includes(p.id)) : undefined
               const blocked = !!inSquad && LEVELS.indexOf(inSquad) < LEVELS.indexOf(level!)
@@ -87,7 +86,7 @@ export function PoolTable({ level, selected, onToggle, height = 640, limit, over
                   <td><PlayerLink p={p} sub={inSquad ? <span style={{ color: blocked ? '#fca5a5' : '#93c5fd' }}>{blocked ? `With the ${LEVEL_NAME[inSquad]} squad · not available` : `In the ${LEVEL_NAME[inSquad]} squad · would move up`}</span> : p.intlRetired ? <span style={{ color: '#f2c46d' }}>Retired from international football</span> : p.injury ? <span style={{ color: '#fca5a5' }}>Injured · {p.injury.name}</span> : p.iranStatus && p.iranStatus !== 'committed' ? `Eligible · ${p.iranStatus}` : undefined} /></td>
                   <td><span className="row" style={{ gap: 4 }}>{p.pos.slice(0, 2).map((x) => <PosTag key={x} pos={x} />)}</span></td>
                   <td className="c num">{ageOf(w, p)}</td><td className="c"><Ovr p={p} /></td><td className="c"><Ovr p={p} pot /></td>
-                  <td><span className="row" style={{ gap: 8 }}>{c ? <><Crest colors={c.colors} logo={clubLogo(c)} /><span className="col" style={{ gap: 1, minWidth: 0 }}><span className="truncate">{c.name}</span><span className="faint row truncate" style={{ fontSize: 11.5, gap: 5 }}><Flag code={c.country} sm />{lg?.name}</span></span></> : <span className="faint">Free agent</span>}</span></td>
+                  <td><span className="row" style={{ gap: 8 }}>{c ? <><Crest colors={c.colors} logo={clubLogo(c)} /><span className="col" style={{ gap: 1, minWidth: 0 }}><span className="truncate">{c.name}</span><span className="faint row truncate" style={{ fontSize: 11.5, gap: 5 }}><Flag code={c.country} sm />{leagueLabel(w, p)}</span></span></> : <span className="faint">Free agent</span>}</span></td>
                   {!slim && <td className="c num">{p.club.mins || '–'}</td>}{!slim && <td className="c num">{p.club.goals}/{p.club.assists}</td>}<td className="c"><FormDots form={p.form} /></td><td className="c"><Rating v={p.form.length ? formAvg(p) : null} /></td>
                   <td className="c num">{p.caps || '–'}</td><td className="r num">{money(p.value)}</td>
                 </tr>

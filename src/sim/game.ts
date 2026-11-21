@@ -70,6 +70,8 @@ export class Game {
    */
   applyPositionFixes(extra: RawExtra | null | undefined, positions: Record<string, Pos[] | string>): number {
     let n = 0
+    // careers started before clubs carried their real league name pick it up here
+    if (extra?.clubLeague) for (const c of this.w.clubs) if (!c.leagueName && extra.clubLeague[c.rid]) c.leagueName = extra.clubLeague[c.rid]
     for (const p of this.w.players) {
       if (!p.real || p.retired) continue
       const hand = positions[p.name]

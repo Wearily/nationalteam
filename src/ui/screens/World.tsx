@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react'
 import { fmtDay } from '../../sim/core/date'
 import { table } from '../../sim/comps/engine'
 import type { GroupStage } from '../../sim/comps/types'
-import { ClubBadge, clubLogo, ageOf, clubOf, Crest, Empty, Flag, leagueOf, money, Ovr, PlayerLink, PosTag, Rating } from '../bits'
+import { ClubBadge, clubLogo, ageOf, clubOf, Crest, Empty, Flag, leagueLabel, leagueOf, money, Ovr, PlayerLink, PosTag, Rating } from '../bits'
 import { useGame } from '../store'
 
 export function Rankings() {
@@ -101,7 +101,7 @@ export function Transfers() {
       </div>
       <div className="grid g2" style={{ alignItems: 'start' }}>
         <div className="card flush"><div className="card-head"><h3>Most valuable Iranians</h3></div><table className="t"><thead><tr><th style={{ width: 30 }}>#</th><th>Player</th><th className="c">Age</th><th className="c">Ovr</th><th className="c">Pot</th><th className="r">Value</th></tr></thead><tbody>{top.map((p, i) => <tr key={p.id} className="click" onClick={() => link(`player:${p.id}`)}><td className="faint num">{i + 1}</td><td><PlayerLink p={p} sub={clubOf(world, p)?.name} /></td><td className="c num">{ageOf(world, p)}</td><td className="c"><Ovr p={p} /></td><td className="c"><Ovr p={p} pot /></td><td className="r num"><b>{money(p.value)}</b></td></tr>)}</tbody></table></div>
-        <div className="card flush"><div className="card-head"><h3>Iranians abroad</h3><span className="faint">{abroad.length} shown, by value</span></div><table className="t"><thead><tr><th>Player</th><th className="c">Age</th><th className="c">Ovr</th><th className="c">Pot</th><th className="c">Mins</th><th className="r">Value</th></tr></thead><tbody>{abroad.map((p) => <tr key={p.id} className="click" onClick={() => link(`player:${p.id}`)}><td><PlayerLink p={p} sub={<><Flag code={clubOf(world, p)!.country} sm />{clubOf(world, p)!.name} · {leagueOf(world, p)!.name}</>} /></td><td className="c num">{ageOf(world, p)}</td><td className="c"><Ovr p={p} /></td><td className="c"><Ovr p={p} pot /></td><td className="c num">{p.club.mins}</td><td className="r num">{money(p.value)}</td></tr>)}</tbody></table></div>
+        <div className="card flush"><div className="card-head"><h3>Iranians abroad</h3><span className="faint">{abroad.length} shown, by value</span></div><table className="t"><thead><tr><th>Player</th><th className="c">Age</th><th className="c">Ovr</th><th className="c">Pot</th><th className="c">Mins</th><th className="r">Value</th></tr></thead><tbody>{abroad.map((p) => <tr key={p.id} className="click" onClick={() => link(`player:${p.id}`)}><td><PlayerLink p={p} sub={<><Flag code={clubOf(world, p)!.country} sm />{clubOf(world, p)!.name} · {leagueLabel(world, p)}</>} /></td><td className="c num">{ageOf(world, p)}</td><td className="c"><Ovr p={p} /></td><td className="c"><Ovr p={p} pot /></td><td className="c num">{p.club.mins}</td><td className="r num">{money(p.value)}</td></tr>)}</tbody></table></div>
       </div>
     </div>
   )

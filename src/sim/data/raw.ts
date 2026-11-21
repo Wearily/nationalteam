@@ -50,6 +50,8 @@ export interface RawClub {
   colors?: [string, string]
   /** Path under public/, e.g. "logos/irn-persepolis.png". */
   logo?: string
+  /** Name of the real league the club plays in, when the game files it under a catch-all bucket. */
+  leagueName?: string
   /** True when the club runs a notable academy. */
   academy?: boolean
 }
@@ -107,7 +109,10 @@ export interface RawExtra {
   patches: Record<string, Partial<RawPlayer>>
   clubs: RawClub[]
   leagues: RawLeague[]
+  clubLeague?: ClubLeagues
 }
+/** The real league a club plays in, where the game only has a catch-all bucket for that country. */
+export type ClubLeagues = Record<string, string>
 export function mergeExtra(raw: RawData, extra?: RawExtra | null): RawData {
   if (!extra) return raw
   const haveL = new Set(raw.leagues.map((l) => l.id))
@@ -116,7 +121,7 @@ export function mergeExtra(raw: RawData, extra?: RawExtra | null): RawData {
   return {
     ...raw,
     leagues: [...raw.leagues, ...extra.leagues.filter((l) => !haveL.has(l.id))],
-    clubs: [...raw.clubs, ...extra.clubs.filter((c) => !haveC.has(c.id))],
+    clubs: [...raw.clubs, ...extra.clubs.filter((c) => !haveC.has(c.id))].map((c) => (extra.clubLeague?.[c.id] ? { ...c, leagueName: extra.clubLeague[c.id] } : c)),
     players: [...raw.players.map((p) => (extra.patches[p.id] ? { ...p, ...extra.patches[p.id] } : p)), ...extra.players.filter((p) => !haveP.has(p.id))],
   }
 }

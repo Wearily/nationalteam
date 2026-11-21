@@ -239,7 +239,7 @@ for e in fm.values():
         if e.get('height'): patch['heightCm'] = e['height']
         if e.get('foot'): patch['foot'] = e['foot']
         if e.get('club') and e['club'] != ex.get('club'): patch['club'] = e['club']
-        elif e.get('noclub') and ex.get('club'): patch['club'] = None  # FotMob has him without a club: a free agent
+        elif e.get('noclub') and ex.get('club') and e.get('dob') and e['dob'] == ex.get('dob'): patch['club'] = None  # FotMob has him without a club: a free agent
         if e.get('value'): patch['valueEur'] = int(e['value'])
         if e.get('num'): patch['num'] = e['num']
         if patch: patches[ex['id']] = patch
@@ -255,7 +255,18 @@ for e in fm.values():
     if e.get('num'): rec['num'] = e['num']
     players.append(rec); face(rec['id'], e['id'])
 json.dump(photos, open(photos_path, 'w'), indent=0, sort_keys=True)
-json.dump({'version': 1, 'players': players, 'patches': patches, 'clubs': new_clubs, 'leagues': new_leagues}, open(os.path.join(ROOT, 'public/data/fotmob.json'), 'w'), separators=(',', ':'))
+# real league names for clubs the game files under a country's catch-all bucket
+club_by_id = {c['id']: c for c in clubs}
+used = {p.get('club') for p in players} | {pt.get('club') for pt in patches.values()} | {p.get('club') for p in iranians}
+club_league = {}
+for tid, cid in club_of_fm.items():
+    c = club_by_id.get(cid)
+    if not c or cid not in used or not str(c.get('league', '')).startswith('other-'): continue
+    td = js(f'https://www.fotmob.com/api/data/teams?id={tid}', f'team-{tid}.json') or {}
+    ln = (td.get('details') or {}).get('primaryLeagueName')
+    if ln: club_league[cid] = ln
+print('league names found for', len(club_league), 'clubs in catch-all buckets')
+json.dump({'version': 1, 'players': players, 'patches': patches, 'clubs': new_clubs, 'leagues': new_leagues, 'clubLeague': club_league}, open(os.path.join(ROOT, 'public/data/fotmob.json'), 'w'), separators=(',', ':'))
 ir_new = [p for p in players if p['nat'][0] == 'IRN']
 abroad = collections.Counter()
 cc = {c['id']: c['country'] for c in clubs}
