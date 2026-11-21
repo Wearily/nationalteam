@@ -1,0 +1,9 @@
+{
+  "_note": "Hand-set style for real coaches, matched by name. formation: one of the game's formations. abroadBias: -1 strongly favours home-based players, +1 strongly favours players abroad. mentality: 25 cautious to 75 attacking. Anyone not listed gets a random style.",
+  "Amir Ghalenoei": { "formation": "4-4-2", "abroadBias": -0.5, "mentality": 50 },
+  "Yahya Golmohammadi": { "formation": "4-2-3-1", "abroadBias": -0.2, "mentality": 48 },
+  "Javad Nekounam": { "formation": "4-2-3-1", "abroadBias": 0, "mentality": 50 },
+  "Moharram Navidkia": { "formation": "4-3-3", "abroadBias": 0, "mentality": 58 },
+  "Farhad Majidi": { "formation": "4-3-3", "abroadBias": 0.1, "mentality": 60 },
+  "Afshin Ghotbi": { "formation": "4-2-3-1", "abroadBias": 0.4, "mentality": 52 }
+}

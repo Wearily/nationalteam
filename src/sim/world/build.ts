@@ -1,6 +1,7 @@
 import { ageOn, parseDay, toDay, type Day } from '../core/date'
 import { Rng, clamp, hashStr } from '../core/rng'
 import { nameKey, type Pos, type RawData, type RawPlayer } from '../data/raw'
+import coachProfiles from '../../../data/overrides/coaches.json'
 import { generateAttrs, overallAt } from '../ratings/attributes'
 import { emptyTactic, FORMATION_KEYS } from '../match/tactics'
 import { genName } from './names'
@@ -73,6 +74,13 @@ export function makePlayer(
 const SQUAD_SHAPE: Pos[] = ['GK', 'GK', 'GK', 'RB', 'RB', 'CB', 'CB', 'CB', 'CB', 'LB', 'LB', 'DM', 'DM', 'CM', 'CM', 'CM', 'AM', 'AM', 'RW', 'RW', 'LW', 'LW', 'ST', 'ST', 'ST', 'CB']
 const YOUTH_SHAPE: Pos[] = ['GK', 'CB', 'CB', 'RB', 'LB', 'DM', 'CM', 'CM', 'AM', 'RW', 'LW', 'ST', 'ST', 'GK', 'CB', 'CM']
 
+type CoachProfile = { formation?: string; abroadBias?: number; mentality?: number }
+const COACHES = new Map<string, CoachProfile>(Object.entries(coachProfiles as unknown as Record<string, CoachProfile | string>).filter(([, v]) => typeof v === 'object').map(([k, v]) => [nameKey(k), v as CoachProfile]))
+/** Hand-set style for a real coach (data/overrides/coaches.json), if he has one. */
+export function coachProfile(name: string): CoachProfile | undefined {
+  const c = COACHES.get(nameKey(name))
+  return c && (!c.formation || FORMATION_KEYS.includes(c.formation)) ? c : undefined
+}
 function staffFrom(rng: Rng, id: number, o: Partial<Staff> & { name: string; dob: Day; nat: string; role: Staff['role']; rep: number }): Staff {
   const q = (o.rep / 100) * 12 + 5
   const sk = () => clamp(Math.round(rng.normal(q, 2.4)), 1, 20)
@@ -257,7 +265,7 @@ export function buildWorld(raw: RawData, seed: number, managerName: string, over
   // ── staff ──
   for (const s of raw.staff ?? []) {
     if (!s.dob) continue
-    const st = staffFrom(new Rng(hashStr(s.id) ^ seed), w.staff.length, { name: s.name, dob: parseDay(s.dob), nat: nations[s.nat] ? s.nat : 'IRN', role: s.role, rep: s.rep ?? 50, real: true })
+    const st = staffFrom(new Rng(hashStr(s.id) ^ seed), w.staff.length, { name: s.name, dob: parseDay(s.dob), nat: nations[s.nat] ? s.nat : 'IRN', role: s.role, rep: s.rep ?? 50, real: true, ...coachProfile(s.name) })
     st.job = s.job
     w.staff.push(st)
   }
