@@ -1,6 +1,6 @@
 import { ageOn, parseDay, toDay, type Day } from '../core/date'
 import { Rng, clamp, hashStr } from '../core/rng'
-import type { Pos, RawData, RawPlayer } from '../data/raw'
+import { nameKey, type Pos, type RawData, type RawPlayer } from '../data/raw'
 import { generateAttrs, overallAt } from '../ratings/attributes'
 import { emptyTactic, FORMATION_KEYS } from '../match/tactics'
 import { genName } from './names'
@@ -38,9 +38,12 @@ const mkTraits = (rng: Rng) => ({
 })
 
 export function potentialFor(rng: Rng, ovr: number, age: number): number {
-  if (age >= 28) return ovr
-  const room = (28 - age) * rng.range(0.35, 1.9) * (age < 21 ? 1.25 : 1)
-  return clamp(Math.round(ovr + Math.max(0, room + rng.normal(0, 2))), ovr, 94)
+  // Most young players improve a little, a few improve a lot: about +3 to +8 at twenty, nothing by 27.
+  // Outstanding ceilings come from hand-set values (data/overrides/ratings.json), not from luck here.
+  if (age >= 27) return ovr
+  let room = (27 - age) * rng.range(0.3, 1.0) * (age < 21 ? 1.15 : 1) + rng.normal(0, 1.3)
+  if (rng.chance(0.05)) room += rng.range(3, 6)
+  return clamp(Math.round(ovr + clamp(room, 0, 15)), ovr, 88)
 }
 
 export function makePlayer(
@@ -84,9 +87,9 @@ const COLORS: [string, string][] = [['#c8102e', '#ffffff'], ['#0b3d91', '#ffffff
 
 export function buildWorld(raw: RawData, seed: number, managerName: string, overrides: Record<string, [number, number] | string> = {}, positions: Record<string, Pos[] | string> = {}): World {
   const posFix = new Map<string, Pos[]>()
-  for (const [k, v] of Object.entries(positions)) if (Array.isArray(v)) posFix.set(k.toLowerCase(), v)
+  for (const [k, v] of Object.entries(positions)) if (Array.isArray(v)) posFix.set(nameKey(k), v)
   const ov = new Map<string, [number, number]>()
-  for (const [k, v] of Object.entries(overrides)) if (Array.isArray(v)) ov.set(k.toLowerCase(), v)
+  for (const [k, v] of Object.entries(overrides)) if (Array.isArray(v)) ov.set(nameKey(k), v)
   const rng = new Rng(seed)
   const today = START_DAY
   const nations: Record<string, Nation> = {}
@@ -139,7 +142,7 @@ export function buildWorld(raw: RawData, seed: number, managerName: string, over
     return est
   }
   for (const r of raw.players) {
-    const pf = posFix.get(r.name.toLowerCase())
+    const pf = posFix.get(nameKey(r.name))
     if (pf) r.pos = pf
     if (!r.dob || !r.pos?.length || !r.nat?.length || !nations[r.nat[0]]) continue
     // year-only birth dates: count the birthday as 1 January so the age ticks over at New Year
@@ -149,7 +152,7 @@ export function buildWorld(raw: RawData, seed: number, managerName: string, over
     if (age < 14 || age > 42) continue
     const club = r.club ? clubByRid.get(r.club) : undefined
     const prng = new Rng(hashStr(r.id) ^ seed)
-    const fixed = ov.get(r.name.toLowerCase())
+    const fixed = ov.get(nameKey(r.name))
     const ovr = fixed ? fixed[0] : estimate(r, club, age, prng)
     const p = makePlayer(w, prng, {
       name: r.name, dob, nat: r.nat.filter((n) => nations[n]), pos: r.pos, clubId: club?.id ?? null, ovr, today,

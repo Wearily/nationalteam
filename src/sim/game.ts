@@ -1,7 +1,7 @@
 import { fmtDay, toDay, ymd, type Day } from './core/date'
 import { Rng, clamp } from './core/rng'
 import { A, fitToOverall, overallAt, posLine } from './ratings/attributes'
-import { mergeExtra, type RawData, type RawExtra } from './data/raw'
+import { mergeExtra, nameKey, type RawData, type RawExtra } from './data/raw'
 import { campLift, developAll, matchLift, revalue, reviewPotential, seasonRollover } from './career/develop'
 import { seasonYearFor, simClubFixture, startLeagueSeason } from './clubs/season'
 import { transferWeek } from './clubs/transfers'
@@ -70,11 +70,12 @@ export class Game {
    */
   applyPositionFixes(extra: RawExtra | null | undefined, positions: Record<string, Pos[] | string>): number {
     let n = 0
+    const byName = new Map(Object.entries(positions).map(([k, v]) => [nameKey(k), v]))
     // careers started before clubs carried their real league name pick it up here
     if (extra?.clubLeague) for (const c of this.w.clubs) if (!c.leagueName && extra.clubLeague[c.rid]) c.leagueName = extra.clubLeague[c.rid]
     for (const p of this.w.players) {
       if (!p.real || p.retired) continue
-      const hand = positions[p.name]
+      const hand = byName.get(nameKey(p.name))
       const next = Array.isArray(hand) ? hand : p.rid ? extra?.patches[p.rid]?.pos : undefined
       if (!next?.length || next.join() === p.pos.join()) continue
       if (next[0] !== p.pos[0] && (next[0] === 'GK') !== (p.pos[0] === 'GK')) continue

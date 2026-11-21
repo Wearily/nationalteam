@@ -212,6 +212,14 @@ def find_existing(e):
         elif e.get('dob') and p.get('dob') and p['dob'][:4] != e['dob'][:4] and not p['dob'].endswith('-07-01'): s_ -= 0.2
         if s_ > bs: best, bs = p, s_
     if best is not None and bs >= 0.9: return best
+    # same birth date at the same club, with a surname in common under a different spelling or a longer
+    # form of the name ("Hossein Kanaani" / "Mohammad Hossein Kanaanizadegan"): one man, not two
+    if e.get('dob') and e.get('club'):
+        et = [t for t in n.split() if len(t) >= 4]
+        for p in iranians:
+            if p.get('dob') != e['dob'] or p.get('club') != e['club']: continue
+            pt_ = [t for t in norm(p['name']).split() if len(t) >= 4]
+            if any(x.startswith(y) or y.startswith(x) or sim(x, y) >= 0.85 for x in et[-2:] for y in pt_[-2:]): return p
     # FotMob often files an Iran-eligible player under his other country (born and raised abroad). He is
     # still the same man as the record we hold: same birth date and the same name.
     if e.get('nat') != 'IRN' and e.get('dob'):

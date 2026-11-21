@@ -111,6 +111,8 @@ export interface RawExtra {
   leagues: RawLeague[]
   clubLeague?: ClubLeagues
 }
+/** Name comparison that ignores case, accents, spaces and hyphens: "Amir Hossein" is "Amirhossein". */
+export const nameKey = (s: string) => s.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z]/g, '')
 /** The real league a club plays in, where the game only has a catch-all bucket for that country. */
 export type ClubLeagues = Record<string, string>
 export function mergeExtra(raw: RawData, extra?: RawExtra | null): RawData {

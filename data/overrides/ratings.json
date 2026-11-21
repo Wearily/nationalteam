@@ -1,13 +1,195 @@
 {
-  "_note": "Hand-set overall/potential for well-known players, matched by name (case-insensitive). Everything else is estimated from club, league, age and caps.",
-  "Mehdi Taremi": [80, 80], "Mohammadjavad Hosseinnejad": [71, 78], "Mohammad Javad Hosseinnejad": [71, 78], "Sardar Azmoun": [77, 77], "Alireza Jahanbakhsh": [73, 73], "Alireza Beiranvand": [76, 76], "Saman Ghoddos": [73, 73],
-  "Saeid Ezatolahi": [73, 73], "Saeid Ezzatollahi": [73, 73], "Ehsan Hajsafi": [70, 70], "Milad Mohammadi": [71, 71], "Majid Hosseini": [73, 73],
-  "Mohammad Hossein Kanaanizadegan": [73, 73], "Hossein Kanaanizadegan": [73, 73], "Rouzbeh Cheshmi": [72, 72], "Ramin Rezaeian": [73, 73], "Omid Noorafkan": [72, 72],
-  "Mehdi Torabi": [72, 72], "Mehdi Ghayedi": [74, 76], "Mohammad Mohebi": [75, 77], "Amirhossein Hosseinzadeh": [73, 76], "Shojae Khalilzadeh": [72, 72],
-  "Payam Niazmand": [72, 73], "Hossein Hosseini": [73, 73], "Ali Gholizadeh": [74, 74], "Allahyar Sayyadmanesh": [72, 75], "Ali Alipour": [72, 72],
-  "Shahriar Moghanlou": [71, 71], "Saleh Hardani": [72, 73], "Aria Yousefi": [71, 77], "Mohammad Ghorbani": [71, 76], "Ali Nemati": [71, 73],
-  "Mehdi Hashemnejad": [71, 73], "Kasra Taheri": [66, 80], "Mohammad Javad Hosseinnejad": [70, 79], "Amirhossein Mahmoudi": [69, 78], "Alireza Koushki": [69, 76],
-  "Arya Yousefi": [71, 77], "Omid Ebrahimi": [69, 69], "Karim Ansarifard": [70, 70], "Morteza Pouraliganji": [71, 71], "Sadegh Moharrami": [71, 71],
-  "Hossein Abarghouei": [70, 74], "Danial Esmaeilifar": [71, 72], "Mohammad Karimi": [71, 72], "Yasin Salmani": [70, 76], "Mohammad Amin Hazbavi": [70, 77],
-  "Dennis Eckert": [72, 73], "Dennis Dargahi": [70, 74], "Abolfazl Jalali": [71, 75], "Zobeir Niknafs": [70, 71], "Mohammad Reza Akhbari": [70, 71]
+ "_note": "Hand-set overall/potential for well-known players, matched by name (case-insensitive). Everything else is estimated from club, league, age and caps.",
+ "Mehdi Taremi": [
+  80,
+  80
+ ],
+ "Mohammadjavad Hosseinnejad": [
+  71,
+  78
+ ],
+ "Mohammad Javad Hosseinnejad": [
+  70,
+  79
+ ],
+ "Sardar Azmoun": [
+  77,
+  77
+ ],
+ "Alireza Jahanbakhsh": [
+  73,
+  73
+ ],
+ "Alireza Beiranvand": [
+  76,
+  76
+ ],
+ "Saman Ghoddos": [
+  73,
+  73
+ ],
+ "Saeid Ezzatollahi": [
+  73,
+  73
+ ],
+ "Ehsan Hajsafi": [
+  70,
+  70
+ ],
+ "Milad Mohammadi": [
+  71,
+  71
+ ],
+ "Majid Hosseini": [
+  73,
+  73
+ ],
+ "Mohammad Hossein Kanaanizadegan": [
+  73,
+  73
+ ],
+ "Rouzbeh Cheshmi": [
+  72,
+  72
+ ],
+ "Ramin Rezaeian": [
+  73,
+  73
+ ],
+ "Omid Noorafkan": [
+  72,
+  72
+ ],
+ "Mehdi Ghayedi": [
+  74,
+  76
+ ],
+ "Mohammad Mohebi": [
+  75,
+  77
+ ],
+ "Amirhossein Hosseinzadeh": [
+  73,
+  76
+ ],
+ "Shojae Khalilzadeh": [
+  72,
+  72
+ ],
+ "Payam Niazmand": [
+  72,
+  73
+ ],
+ "Hossein Hosseini": [
+  73,
+  73
+ ],
+ "Ali Gholizadeh": [
+  74,
+  74
+ ],
+ "Allahyar Sayyadmanesh": [
+  72,
+  75
+ ],
+ "Ali Alipour": [
+  72,
+  72
+ ],
+ "Shahriar Moghanlou": [
+  71,
+  71
+ ],
+ "Saleh Hardani": [
+  72,
+  73
+ ],
+ "Aria Yousefi": [
+  71,
+  77
+ ],
+ "Mohammad Ghorbani": [
+  71,
+  76
+ ],
+ "Ali Nemati": [
+  71,
+  73
+ ],
+ "Mehdi Hashemnejad": [
+  71,
+  73
+ ],
+ "Kasra Taheri": [
+  66,
+  80
+ ],
+ "Amirhossein Mahmoudi": [
+  69,
+  78
+ ],
+ "Alireza Koushki": [
+  69,
+  76
+ ],
+ "Omid Ebrahimi": [
+  69,
+  69
+ ],
+ "Karim Ansarifard": [
+  70,
+  70
+ ],
+ "Morteza Pouraliganji": [
+  71,
+  71
+ ],
+ "Sadegh Moharrami": [
+  71,
+  71
+ ],
+ "Hossein Abarghouei": [
+  70,
+  74
+ ],
+ "Danial Esmaeilifar": [
+  71,
+  72
+ ],
+ "Mohammad Karimi": [
+  71,
+  72
+ ],
+ "Yasin Salmani": [
+  70,
+  76
+ ],
+ "Mohammad Amin Hazbavi": [
+  70,
+  77
+ ],
+ "Dennis Dargahi": [
+  70,
+  74
+ ],
+ "Abolfazl Jalali": [
+  71,
+  75
+ ],
+ "Zobeir Niknafs": [
+  70,
+  71
+ ],
+ "Mohammad Reza Akhbari": [
+  70,
+  71
+ ],
+ "Mahdi Torabi": [
+  72,
+  72
+ ],
+ "Dennis Eckert Ayensa": [
+  72,
+  73
+ ]
 }
