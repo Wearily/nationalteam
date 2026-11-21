@@ -9,7 +9,7 @@ import { clubLogo, ageOf, clubOf, Crest, Flag, FormDots, leagueLabel, money, Ovr
 import { useGame } from '../store'
 
 type SortKey = 'ovr' | 'pot' | 'age' | 'form' | 'value' | 'caps' | 'name' | 'goals' | 'mins'
-const WHERE = [['all', 'Anywhere'], ['iran', 'In Iran'], ['abroad', 'Abroad'], ['europe', 'Europe'], ['gulf', 'Gulf & Asia']] as const
+const WHERE = [['all', 'Anywhere'], ['iran', 'In Iran'], ['abroad', 'Abroad'], ['europe', 'Europe'], ['gulf', 'Gulf & Asia'], ['rest', 'Americas & elsewhere']] as const
 
 /** Sortable, filterable list of everyone eligible (or potentially eligible) for Iran. */
 export function PoolTable({ level, selected, onToggle, height = 640, limit, overage = 0 }: { level?: Level; selected?: Set<number>; onToggle?: (p: Player) => void; height?: number | string; limit?: number; /** Over-age players allowed in the squad being named. */ overage?: number }) {
@@ -39,7 +39,8 @@ export function PoolTable({ level, selected, onToggle, height = 640, limit, over
         if (where === 'iran' && c?.country !== 'IRN') return false
         if (where === 'abroad' && (!c || c.country === 'IRN')) return false
         if (where === 'europe' && conf !== 'UEFA') return false
-        if (where === 'gulf' && (!c || c.country === 'IRN' || conf === 'UEFA')) return false
+        if (where === 'gulf' && (!c || c.country === 'IRN' || conf !== 'AFC')) return false
+        if (where === 'rest' && (!c || conf === 'AFC' || conf === 'UEFA')) return false
       }
       return true
     })

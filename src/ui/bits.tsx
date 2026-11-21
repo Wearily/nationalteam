@@ -27,7 +27,8 @@ export function leagueLabel(w: World, p: Player): string | null {
   const c = w.clubs[p.clubId]
   const lg = w.leagues[c.leagueId]
   if (!lg.virtual && !lg.name.includes('other clubs')) return lg.name
-  return c.leagueName ?? `${w.nations[lg.country]?.name ?? lg.country} · league not listed`
+  if (c.leagueName) return c.leagueName.replace(/\s+(Playoffs?|Play-offs?|Qualification|Relegation Group|Championship Group)$/i, '')
+  return `${w.nations[lg.country]?.name ?? lg.country} · league not listed`
 }
 export const leagueOf = (w: World, p: Player) => (p.clubId != null ? w.leagues[w.clubs[p.clubId].leagueId] : null)
 export const isAbroad = (w: World, p: Player) => { const c = clubOf(w, p); return !!c && c.country !== 'IRN' }
