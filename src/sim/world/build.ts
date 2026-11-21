@@ -1,8 +1,9 @@
 import { ageOn, parseDay, toDay, type Day } from '../core/date'
 import { Rng, clamp, hashStr } from '../core/rng'
 import { nameKey, type Pos, type RawData, type RawPlayer } from '../data/raw'
+import attrFixes from '../../../data/overrides/attributes.json'
 import coachProfiles from '../../../data/overrides/coaches.json'
-import { generateAttrs, overallAt } from '../ratings/attributes'
+import { A, fitToOverall, generateAttrs, overallAt } from '../ratings/attributes'
 import { emptyTactic, FORMATION_KEYS } from '../match/tactics'
 import { genName } from './names'
 import type { World } from './state'
@@ -74,6 +75,7 @@ export function makePlayer(
 const SQUAD_SHAPE: Pos[] = ['GK', 'GK', 'GK', 'RB', 'RB', 'CB', 'CB', 'CB', 'CB', 'LB', 'LB', 'DM', 'DM', 'CM', 'CM', 'CM', 'AM', 'AM', 'RW', 'RW', 'LW', 'LW', 'ST', 'ST', 'ST', 'CB']
 const YOUTH_SHAPE: Pos[] = ['GK', 'CB', 'CB', 'RB', 'LB', 'DM', 'CM', 'CM', 'AM', 'RW', 'LW', 'ST', 'ST', 'GK', 'CB', 'CM']
 
+const ATTR_FIX = new Map<string, Record<string, number>>(Object.entries(attrFixes as unknown as Record<string, Record<string, number> | string>).filter(([, v]) => typeof v === 'object').map(([k, v]) => [nameKey(k), v as Record<string, number>]))
 type CoachProfile = { formation?: string; abroadBias?: number; mentality?: number }
 const COACHES = new Map<string, CoachProfile>(Object.entries(coachProfiles as unknown as Record<string, CoachProfile | string>).filter(([, v]) => typeof v === 'object').map(([k, v]) => [nameKey(k), v as CoachProfile]))
 /** Hand-set style for a real coach (data/overrides/coaches.json), if he has one. */
@@ -168,6 +170,15 @@ export function buildWorld(raw: RawData, seed: number, managerName: string, over
     })
     if (r.valueEur) { p.value = r.valueEur; p.valueHist = [[today, p.value]] }
     if (approx) p.dobApprox = true
+    // hand-set attributes: fix those, let the rest settle around the overall, then fix them again
+    const locks = ATTR_FIX.get(nameKey(r.name))
+    if (locks) {
+      const set = () => { for (const [k, v] of Object.entries(locks)) if (k in A) p.attrs[A[k as keyof typeof A]] = clamp(Math.round(v), 5, 99) }
+      set()
+      if (fixed) { p.attrs = fitToOverall(p.attrs, p.pos[0], fixed[0]); set() }
+      p.ovr = overallAt(p.attrs, p.pos[0])
+      if (p.pot < p.ovr) p.pot = p.ovr
+    }
     p.caps = r.caps ?? 0
     p.goals = r.goals ?? 0
     p.capTied = !!r.capTied || p.caps >= 3

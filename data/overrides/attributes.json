@@ -1,0 +1,4 @@
+{
+  "_note": "Hand-set individual attributes (1-99) for real players, matched by name. Only the attributes listed are fixed; the rest are generated around the player's overall. Attribute names: finishing longShots firstTouch dribbling passing crossing technique heading tackling marking setPieces penalties decisions anticipation composure vision offTheBall positioning workRate aggression leadership teamwork pace acceleration agility strength stamina jumping handling reflexes command oneOnOnes kicking.",
+  "Mohammadjavad Hosseinnejad": { "pace": 78, "acceleration": 81, "agility": 80, "dribbling": 81, "technique": 78, "firstTouch": 77 }
+}
