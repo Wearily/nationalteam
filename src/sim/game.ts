@@ -11,6 +11,7 @@ import { addFriendly, ASIAN_CUP_2027, cancelClashingFriendlies, openSlots, planY
 import { applyRanking, rerank } from './intl/ranking'
 import { ageEligible, aiTactic, buildMTeam, eligible, pickSquad, selectionScore, teamName } from './intl/select'
 import { MatchSim } from './match/engine'
+import { expectedGoals } from './match/quick'
 import type { Tactic } from './match/tactics'
 import type { Frame, MatchReport, MatchSnapshot, MEvent, ShotRec } from './match/types'
 import { buildWorld } from './world/build'
@@ -727,9 +728,10 @@ export class Game {
   /** Age-group matches between two other nations: a quick result from the nations' levels, no squads needed. */
   private fastNat(f: Fixture, comp: Comp) {
     const lv = (ref: string) => this.w.nations[ref.split(':')[1]]?.level ?? 60
-    const d = lv(f.home) - lv(f.away) + (f.neutral ? 0 : 2)
-    f.hg = this.rng.poisson(1.35 * Math.exp(0.05 * d))
-    f.ag = this.rng.poisson(1.35 * Math.exp(-0.05 * d))
+    const d = lv(f.home) - lv(f.away)
+    const [lh, la] = expectedGoals(d, !!f.neutral)
+    f.hg = this.rng.poisson(lh)
+    f.ag = this.rng.poisson(la)
     if (this.isKo(f, comp) && f.hg === f.ag) {
       const st = comp.stages[f.stage] as KoStage
       const level = st.legs === 1 || (() => { const first = this.w.fixtures.find((x) => x.compId === f.compId && x.stage === f.stage && x.slot === f.slot && x.round === 0); return !first || first.hg + f.ag === first.ag + f.hg })()
@@ -767,6 +769,8 @@ export class Game {
   liveTactic(tac: Tactic) { this.live!.sim.setTactic(this.live!.side, tac) }
   liveFinish(): number {
     const L = this.live!
+    // skipping the rest: the head coach sees it out (substitutions, changes), exactly as in a simulated match
+    if (!L.sim.done) L.sim.setAi(L.side, true)
     L.sim.run()
     this.finishNat(L.fixture, L.sim)
     this.live = null

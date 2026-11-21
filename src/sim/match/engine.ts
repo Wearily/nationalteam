@@ -43,6 +43,7 @@ type Restart = 'kickoff' | 'goalkick' | 'corner' | 'freekick' | 'throw' | 'penal
 
 const LONG = 0.12
 const RATE_KNEE = 7.7
+const PASS_T = 0.5
 const RATE_SPAN = 2.6
 export class MatchSim {
   teams: [MTeam, MTeam]
@@ -113,7 +114,7 @@ export class MatchSim {
         return 1 + this.rng.normal(0, spread) + p.form * 0.03 + big
       })
     }
-    this.boost = opts.neutral ? [1, 1] : [1.009, 0.996]
+    this.boost = opts.neutral ? [1, 1] : [1.022, 0.986]
     this.poss = this.rng.chance(0.5) ? 0 : 1
     this.resetShape()
   }
@@ -560,7 +561,7 @@ export class MatchSim {
     const direct = this.teams[t].tactic.directness / 100
     let ps = sig(3.25 + (passSkill - 62) / 21 - d / 15 - pressure * 1.3 + clamp(open.d - 3, -3, 6) / 3.6 - Math.max(0, fwd) * 5.2 * (1 - direct * 0.3))
     if (j === 0) ps = Math.min(0.99, ps + 0.2)
-    this.tick(0.4 + d / 22)
+    this.tick(PASS_T + d / 22)
     // through ball beyond the line → offside chance
     const rnx = this.nx(t, this.px[gj])
     if (rnx > 0.55 && fwd > 0.1 && j !== 0) {
@@ -585,7 +586,8 @@ export class MatchSim {
       if (open.d < 2.2 && this.rng.chance(0.22 - this.at(t, j, A.firstTouch) / 600)) {
         this.st(t, j).lost++
         this.rate(t, j, -0.06)
-        this.st(o, open.s).interceptions++
+        // robbing a man who took a heavy touch is a tackle, not an interception
+        this.st(o, open.s).tackles++; this.st(o, open.s).tacklesWon++; this.ts[o].tackles++
         this.rate(o, open.s, 0.035)
         this.lastPasser = -1
         this.setCarrier(o, open.s)

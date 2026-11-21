@@ -7,6 +7,7 @@ import { MatchSim } from '../src/sim/match/engine'
 import { generateAttrs, overallAt, POS_LIST } from '../src/sim/ratings/attributes'
 import type { Fixture } from '../src/sim/world/types'
 import { synthTeam } from '../tools/calibrate'
+import { engineLine, quickLine } from '../tools/parity'
 import { shotShare } from '../tools/shotshare'
 import { synthRaw } from '../tools/synthRaw'
 
@@ -117,9 +118,34 @@ describe('live match lineup', () => {
     expect(on.length).toBeGreaterThanOrEqual(10 - reds)
     const rid = g.liveFinish()
     const rep = g.w.reports.find((x) => x.id === rid)!
+    // the rest of the match was skipped with the user in charge: the coach still used his bench
+    expect(rep.players[side].filter((p) => p.subOn).length).toBeGreaterThanOrEqual(3)
     expect(new Set(rep.lineups[side]).size).toBe(11)
     for (const id of rep.lineups[side]) expect(rep.players[side].some((p) => p.id === id && p.played && !p.subOn)).toBe(true)
   })
+})
+
+describe('match parity', () => {
+  const pair = (seed: number) => { const r = new Rng(seed); return [synthTeam(r, 'H', 72, '4-3-3', 0), synthTeam(r, 'A', 71, '4-2-3-1', 100)] as const }
+  const opts = (record: boolean) => ({ seed: 77, neutral: false, knockout: false, subs: 5, importance: 0.6, record })
+  it('gives the same match whether it is run in one go, stepped, or recorded for the viewer', () => {
+    const [h1, a1] = pair(3); const one = new MatchSim(h1, a1, opts(false)).run()
+    const [h2, a2] = pair(3); const two = new MatchSim(h2, a2, opts(true)); while (!two.done) for (let k = 0; k < 13 && !two.done; k++) two.step()
+    expect(two.score).toEqual(one.score)
+    expect(two.events.map((e) => `${e.min}${e.type}${e.p}`)).toEqual(one.events.map((e) => `${e.min}${e.type}${e.p}`))
+  })
+  it('quick results match the full engine for the same match-up', () => {
+    for (const gap of [0, 12]) {
+      const e = engineLine(gap, false, 220), q = quickLine(gap, false, 20000)
+      expect(Math.abs(e.gf - q.gf), `home goals at gap ${gap}`).toBeLessThan(0.3)
+      expect(Math.abs(e.ga - q.ga), `away goals at gap ${gap}`).toBeLessThan(0.25)
+      expect(Math.abs(e.w - q.w), `home win rate at gap ${gap}`).toBeLessThan(0.09)
+    }
+    // home advantage exists and is the same size in both
+    const even = engineLine(0, false, 220)
+    expect(even.gf).toBeGreaterThan(even.ga)
+    expect(even.w).toBeGreaterThan(even.l)
+  }, 90_000)
 })
 
 describe('career', () => {

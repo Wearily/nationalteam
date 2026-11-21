@@ -3,6 +3,7 @@ import { clamp, type Rng } from '../core/rng'
 import { A, posLine } from '../ratings/attributes'
 import { dynOvr } from '../ratings/dynamic'
 import { makeGroupFixtures } from '../comps/engine'
+import { expectedGoals } from '../match/quick'
 import type { Comp } from '../comps/types'
 import type { Index, World } from '../world/state'
 import { clubRef, parseRef, type Fixture, type League, type Player } from '../world/types'
@@ -28,7 +29,7 @@ export function startLeagueSeason(w: World, lg: League, year: number): Comp | nu
   return comp
 }
 
-const GOAL_W: Record<string, number> = { ST: 4.2, RW: 2.3, LW: 2.3, AM: 2.1, CM: 1, DM: 0.5, RB: 0.35, LB: 0.35, CB: 0.45, GK: 0 }
+const GOAL_W: Record<string, number> = { ST: 3.0, RW: 2.6, LW: 2.6, AM: 2.4, CM: 1, DM: 0.5, RB: 0.35, LB: 0.35, CB: 0.45, GK: 0 }
 const AST_W: Record<string, number> = { ST: 1.6, RW: 2.6, LW: 2.6, AM: 3, CM: 1.9, DM: 0.9, RB: 1.3, LB: 1.3, CB: 0.3, GK: 0.05 }
 
 interface Side { clubId: number; str: number; starters: Player[]; subs: Player[]; anon: number }
@@ -70,7 +71,7 @@ function credit(side: Side, goals: number, conceded: number, rng: Rng, f: Fixtur
   const ga = new Map<number, [number, number]>()
   for (const [p, mins] of involved) {
     ga.set(p.id, [0, 0])
-    const base = 6.45 + diff * 0.17 + (p.ovr - side.str) * 0.035 + rng.normal(0, 0.45 + (20 - p.traits.consistency) * 0.022)
+    const base = 6.36 + diff * 0.17 + (p.ovr - side.str) * 0.035 + rng.normal(0, 0.45 + (20 - p.traits.consistency) * 0.022)
     rating.set(p.id, mins < 45 ? 6.3 + (base - 6.3) * 0.6 : base)
     p.club.apps++
     if (mins === 90) p.club.starts++
@@ -78,7 +79,7 @@ function credit(side: Side, goals: number, conceded: number, rng: Rng, f: Fixtur
     p.sharp = Math.min(100, p.sharp + (mins / 90) * 9)
     p.cond = Math.max(40, p.cond - (mins / 90) * 22)
     if (conceded === 0 && mins === 90 && (posLine(p.pos[0]) === 'DEF' || p.pos[0] === 'GK')) { p.club.cleanSheets++; rating.set(p.id, rating.get(p.id)! + 0.45) }
-    if (rng.chance(0.11)) p.club.yellows++
+    if (rng.chance(0.19 * (mins / 90))) p.club.yellows++
     if (rng.chance(0.0045 * (0.5 + p.traits.injuryProne / 10) * (mins / 90))) {
       const sev = rng.next()
       const days = sev < 0.55 ? rng.int(5, 14) : sev < 0.88 ? rng.int(15, 45) : rng.int(60, 240)
@@ -99,7 +100,7 @@ function credit(side: Side, goals: number, conceded: number, rng: Rng, f: Fixtur
       rating.set(scorer.id, rating.get(scorer.id)! + 0.95)
       ;(f.scorers ??= []).push([scorer.id, min, sideIdx])
     }
-    if (rng.chance(0.78)) {
+    if (rng.chance(0.74)) {
       const totA = involved.reduce((a, x) => a + (x[0] === scorer ? 0 : wOf(AST_W, A.passing)(x)), 0) + anonW * 1.3
       let ra = rng.next() * totA
       for (const x of involved) {
@@ -130,8 +131,9 @@ export function simClubFixture(w: World, idx: Index, f: Fixture, rng: Rng, away:
   const hs = lineupFor(w, idx, h.clubId, rng, away)
   const as = lineupFor(w, idx, a.clubId, rng, away)
   const d = hs.str - as.str
-  f.hg = rng.poisson(1.36 * Math.exp(0.046 * d) * 1.1)
-  f.ag = rng.poisson(1.36 * Math.exp(-0.046 * d) * 0.92)
+  const [lh, la] = expectedGoals(d, !!f.neutral)
+  f.hg = rng.poisson(lh)
+  f.ag = rng.poisson(la)
   f.played = true
   credit(hs, f.hg, f.ag, rng, f, 0, f.day)
   credit(as, f.ag, f.hg, rng, f, 1, f.day)

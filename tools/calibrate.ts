@@ -67,6 +67,10 @@ if (process.argv[1]?.endsWith('calibrate.ts')) {
     }
     console.log(`mirrored 4-3-3: home wins ${Math.round((H / M) * 100)}%  away wins ${Math.round((Aw / M) * 100)}% [home > away]  shots ${(sh / M).toFixed(1)}-${(sa / M).toFixed(1)}`)
   }
+  void import('./parity').then(({ engineLine, quickLine }) => {
+    console.log('engine v quick results (home goals-away goals, home win %):')
+    for (const gap of [0, 8, 12]) { const e = engineLine(gap, false, Math.min(N, 300)), q = quickLine(gap, false, 20000); console.log(`  gap ${gap}: engine ${e.gf.toFixed(2)}-${e.ga.toFixed(2)} ${Math.round(e.w * 100)}%   quick ${q.gf.toFixed(2)}-${q.ga.toFixed(2)} ${Math.round(q.w * 100)}%`) }
+  })
   void import('./shotshare').then(({ shotShare }) => {
     const pc = (x: number) => `${Math.round(x * 100)}%`
     for (const gap of [0, 12]) {
