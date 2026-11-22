@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { roundRobin, table } from '../src/sim/comps/engine'
+import { makeKoFixtures, roundName, roundRobin, table } from '../src/sim/comps/engine'
 import { Rng } from '../src/sim/core/rng'
 import { Game } from '../src/sim/game'
 import { applyRanking } from '../src/sim/intl/ranking'
@@ -146,6 +146,32 @@ describe('match parity', () => {
     expect(even.gf).toBeGreaterThan(even.ga)
     expect(even.w).toBeGreaterThan(even.l)
   }, 90_000)
+})
+
+describe('third-place play-off', () => {
+  it('sends beaten semi-finalists to a third-place match, not the final, and names it correctly', () => {
+    const g = Game.create(synthRaw(), 3, 'T', {}, null)
+    const w = g.w
+    const d = w.day + 5
+    const teams = ['n:IRN:senior', 'n:JPN:senior', 'n:KOR:senior', 'n:AUS:senior']
+    const comp = { id: w.comps.length, key: 'test-cup:2027', name: 'Test Cup', short: 'Test Cup', scope: 'nat' as const, level: 'senior' as const, season: 2027, weight: 0,
+      stages: [{ type: 'ko' as const, name: 'Semi-finals', legs: 1 as const, days: [d], neutral: true, teams, fixturesMade: false }, { type: 'ko' as const, name: 'Final', legs: 1 as const, days: [d + 4], neutral: true, teams: [], fixturesMade: false, thirdPlace: d + 3 }],
+      cur: 0, done: false, squadSize: 23, subs: 5 }
+    w.comps.push(comp)
+    makeKoFixtures(w, comp, 0)
+    const semis = w.fixtures.filter((f) => f.compId === comp.id)
+    for (const f of semis) { f.played = true; const iranHome = f.home === teams[0]; f.hg = iranHome ? 0 : 2; f.ag = iranHome ? 2 : 1 }
+    const before = w.inbox.length
+    ;(g as unknown as { afterFixture: (f: Fixture) => void }).afterFixture(semis[semis.length - 1])
+    const later = w.fixtures.filter((f) => f.compId === comp.id && !f.played)
+    const iran = later.find((f) => f.home === teams[0] || f.away === teams[0])!
+    const final = later.find((f) => f.slot !== 99)!
+    expect(iran.slot).toBe(99)
+    expect(roundName(comp, iran)).toBe('Third-place play-off')
+    expect(roundName(comp, final)).toBe('Final')
+    expect([final.home, final.away]).not.toContain(teams[0])
+    expect(w.inbox.slice(before).some((m) => /third-place play-off/i.test(m.body))).toBe(true)
+  })
 })
 
 describe('career', () => {

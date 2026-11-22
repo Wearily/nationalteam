@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { fmtDay, fmtDow, monthName, ymd } from '../../sim/core/date'
-import { groupTables, stageFixtures } from '../../sim/comps/engine'
+import { groupTables, roundName, stageFixtures } from '../../sim/comps/engine'
 import type { Comp, GroupStage, KoStage, Row } from '../../sim/comps/types'
 import { openSlots } from '../../sim/intl/calendar'
 import { teamName } from '../../sim/intl/select'
@@ -50,6 +50,7 @@ function Bracket({ comp }: { comp: Comp }) {
                 </div>
               )
             })}
+            {fx.filter((f) => f.slot === 99).map((f) => <div key={f.id} style={{ marginTop: 14 }}><div className="eyebrow">{roundName(comp, f)}</div><div className="tie"><FixtureLine f={f} /></div></div>)}
           </div>
         )
       })}
@@ -143,7 +144,7 @@ export function Calendar() {
         <div className="col" style={{ gap: 18 }}>
           {[...months.entries()].map(([k, list]) => (
             <div key={k} className="card"><div className="card-head"><h3>{k}</h3></div>
-              {list.map((f) => <div key={f.id} className="row"><span className="faint" style={{ width: 34, fontSize: 11.5 }}>{fmtDow(f.day)}</span><div className="grow"><FixtureLine f={f} /></div><span className="faint truncate" style={{ width: 150, fontSize: 12 }}>{world.comps[f.compId].short}{f.home.split(':')[2] !== 'senior' ? ` · ${LEVEL_NAME[f.home.split(':')[2] as 'u23']}` : ''}</span></div>)}
+              {list.map((f) => <div key={f.id} className="row"><span className="faint" style={{ width: 34, fontSize: 11.5 }}>{fmtDow(f.day)}</span><div className="grow"><FixtureLine f={f} /></div><span className="faint truncate" style={{ width: 230, fontSize: 12 }}>{world.comps[f.compId].short}{world.comps[f.compId].stages[f.stage]?.type === 'ko' ? ` · ${roundName(world.comps[f.compId], f)}` : ''}{f.home.split(':')[2] !== 'senior' ? ` · ${LEVEL_NAME[f.home.split(':')[2] as 'u23']}` : ''}</span></div>)}
             </div>
           ))}
           {!fx.length && <div className="card"><Empty>No fixtures scheduled.</Empty></div>}

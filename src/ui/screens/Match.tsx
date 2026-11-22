@@ -8,6 +8,7 @@ import { LEVEL_NAME, type Level } from '../../sim/world/types'
 import { FORMATIONS } from '../../sim/match/tactics'
 import { Empty, Face, Flag, OvrNum, PosTag, ratingColor } from '../bits'
 import { sim, useGame } from '../store'
+import { roundName } from '../../sim/comps/engine'
 import { normaliseTactic, TacticsEditor } from './Tactics'
 
 const PL = 105
@@ -358,7 +359,7 @@ export function MatchCentre({ fixtureId }: { fixtureId: number }) {
         <div className="card" style={{ background: 'linear-gradient(135deg, rgba(22,163,74,0.18), rgba(255,255,255,0.03) 45%, rgba(220,38,38,0.18))' }}>
           <div className="scoreboard">
             <div className="side"><Flag code={f.home.split(':')[1]} lg /><div><b>{home.name}</b><div className="muted">#{world.nations[f.home.split(':')[1]]?.rank}</div></div></div>
-            <div className="center"><div className="eyebrow">{comp.name}{comp.friendly ? '' : ` · ${comp.stages[f.stage].name}`}</div><div style={{ fontSize: 30, fontWeight: 300, opacity: 0.6, margin: '4px 0' }}>vs</div><span className="pill">{f.neutral ? 'Neutral venue' : side === 0 ? 'Home' : 'Away'}</span></div>
+            <div className="center"><div className="eyebrow">{comp.name}{comp.friendly ? '' : ` · ${roundName(comp, f)}`}</div><div style={{ fontSize: 30, fontWeight: 300, opacity: 0.6, margin: '4px 0' }}>vs</div><span className="pill">{f.neutral ? 'Neutral venue' : side === 0 ? 'Home' : 'Away'}</span></div>
             <div className="side away"><Flag code={f.away.split(':')[1]} lg /><div><b>{away.name}</b><div className="muted">#{world.nations[f.away.split(':')[1]]?.rank}</div></div></div>
           </div>
           <div className="row" style={{ justifyContent: 'center', gap: 14, paddingBottom: 8 }}>

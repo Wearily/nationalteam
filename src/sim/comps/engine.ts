@@ -241,6 +241,12 @@ export function progress(w: World, comp: Comp, rng: Rng): boolean {
   return true
 }
 
+/** What to call a fixture's round. The third-place match is stored with the final but is not the final. */
+export function roundName(comp: Comp, f: Pick<Fixture, 'stage' | 'slot'>): string {
+  if (f.slot === 99) return comp.key.startsWith('olympics') || comp.key.startsWith('asian-games') ? 'Bronze medal match' : 'Third-place play-off'
+  return comp.stages[f.stage]?.name ?? ''
+}
+
 export const ordinal = (n: number) => `${n}${['th', 'st', 'nd', 'rd'][n % 100 > 10 && n % 100 < 14 ? 0 : n % 10 < 4 ? n % 10 : 0]}`
 
 export function koDays(start: Day, gaps: number[]): Day[] {

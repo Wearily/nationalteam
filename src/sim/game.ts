@@ -5,7 +5,7 @@ import { mergeExtra, nameKey, type RawData, type RawExtra } from './data/raw'
 import { campLift, developAll, matchLift, revalue, reviewPotential, seasonRollover } from './career/develop'
 import { seasonYearFor, simClubFixture, startLeagueSeason } from './clubs/season'
 import { transferWeek } from './clubs/transfers'
-import { progress } from './comps/engine'
+import { progress, roundName } from './comps/engine'
 import type { Comp, GroupStage, KoStage } from './comps/types'
 import { addFriendly, ASIAN_CUP_2027, cancelClashingFriendlies, openSlots, planYear, rebuildCamps, scheduleYear, setupAsianCup, setupOlympics, setupWorldCup, setupYouthWorldCup } from './intl/calendar'
 import { applyRanking, rerank } from './intl/ranking'
@@ -626,8 +626,8 @@ export class Game {
       w.fed.board = clamp(w.fed.board + delta, 0, 100)
       w.fed.media = clamp(w.fed.media + delta * 1.1, 0, 100)
       const scorers = sim.events.filter((e) => (e.type === 'goal' || e.type === 'pen') && e.team === me).map((e) => `${names[e.p!]?.split(' ').slice(-1)[0]} ${e.min}'`)
-      this.news('intl', `${sim.teams[0].name} ${f.hg}–${f.ag} ${sim.teams[1].name}${f.pens ? ` (${f.pens[0]}–${f.pens[1]} on penalties)` : ''} · ${comp.short}${scorers.length ? ' · ' + scorers.join(', ') : ''}`, undefined, `fixture:${f.id}`)
-      this.msg('match', `${LEVEL_NAME[level]}: ${sim.teams[0].name} ${f.hg}–${f.ag} ${sim.teams[1].name}${f.pens ? ` (${f.pens[0]}–${f.pens[1]} pens)` : ''}`, `${comp.name}${comp.friendly ? '' : ' · ' + comp.stages[f.stage].name}.${scorers.length ? ' Scorers: ' + scorers.join(', ') + '.' : ''}${motm >= 0 ? ` Player of the match: ${names[motm]} (${best.toFixed(1)}).` : ''}`, level === 'senior', `fixture:${f.id}`)
+      this.news('intl', `${sim.teams[0].name} ${f.hg}–${f.ag} ${sim.teams[1].name}${f.pens ? ` (${f.pens[0]}–${f.pens[1]} on penalties)` : ''} · ${comp.short}${f.slot === 99 ? ' ' + roundName(comp, f).toLowerCase() : ''}${scorers.length ? ' · ' + scorers.join(', ') : ''}`, undefined, `fixture:${f.id}`)
+      this.msg('match', `${LEVEL_NAME[level]}: ${sim.teams[0].name} ${f.hg}–${f.ag} ${sim.teams[1].name}${f.pens ? ` (${f.pens[0]}–${f.pens[1]} pens)` : ''}`, `${comp.name}${comp.friendly ? '' : ' · ' + roundName(comp, f)}.${scorers.length ? ' Scorers: ' + scorers.join(', ') + '.' : ''}${motm >= 0 ? ` Player of the match: ${names[motm]} (${best.toFixed(1)}).` : ''}`, level === 'senior', `fixture:${f.id}`)
     }
     this.afterFixture(f)
   }
@@ -661,11 +661,16 @@ export class Game {
   private eliminated(comp: Comp, stage: string) {
     const w = this.w
     const team = w.teams[comp.level]
-    this.msg('match', `Iran out of the ${comp.name}`, `The ${LEVEL_NAME[comp.level]} team's tournament ends at the ${stage.toLowerCase()}.`, true, `comp:${comp.id}`)
-    w.history.push({ year: comp.season, comp: comp.name, level: comp.level, result: stage })
-    // beaten semi-finalists still have the third-place play-off: the squad stays until that is played
     const ref = natRef('IRN', comp.level)
-    if (w.fixtures.some((f) => f.compId === comp.id && !f.played && (f.home === ref || f.away === ref))) return
+    // beaten semi-finalists still have the third-place play-off: say so, and keep the squad until it is played
+    const third = w.fixtures.find((f) => f.compId === comp.id && !f.played && (f.home === ref || f.away === ref))
+    w.history.push({ year: comp.season, comp: comp.name, level: comp.level, result: stage })
+    if (third) {
+      const name = roundName(comp, third)
+      this.msg('match', `${comp.short}: beaten in the ${stage.toLowerCase()}`, `Iran will not play in the final. One match remains: the ${name.toLowerCase()} against ${teamName(w, third.home === ref ? third.away : third.home).name} on ${fmtDay(third.day)}, between the two beaten semi-finalists.`, true, `comp:${comp.id}`)
+      return
+    }
+    this.msg('match', `Iran out of the ${comp.name}`, `The ${LEVEL_NAME[comp.level]} team's tournament ends at the ${stage.toLowerCase()}.`, true, `comp:${comp.id}`)
     team.squad = []
     for (const c of w.camps) if (c.level === comp.level && c.compId === comp.id) c.done = true
   }
