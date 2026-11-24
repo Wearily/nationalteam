@@ -174,6 +174,34 @@ describe('third-place play-off', () => {
   })
 })
 
+describe('match left half-played', () => {
+  it('is picked up where it was, not restarted, and blocks the calendar until finished', () => {
+    const g = Game.create(synthRaw(), 21, 'T', {}, null)
+    for (const t of Object.values(g.w.teams)) t.control = 'auto'
+    g.w.teams.senior.control = 'manual'
+    let r = g.advance(400)
+    while (r.stop !== 'match') {
+      if (r.stop === 'squad') g.announceSquad('senior', g.suggestSquad('senior', g.w.camps.find((c) => c.id === r.campId)!.size), false)
+      r = g.advance(400)
+    }
+    const id = r.fixtureId!
+    let c = g.liveStart(id)
+    if (typeof c === 'string') throw new Error(c)
+    for (let i = 0; i < 20; i++) c = g.liveStep(40)
+    const before = g.liveStep(0).snap
+    expect(g.liveStart(id)).toBe('That match is already in progress.')
+    const back = g.liveResume(id)!
+    expect(back.chunk.snap.score).toEqual(before.score)
+    expect(back.chunk.snap.min).toBe(before.min)
+    expect(back.chunk.frames.length).toBeGreaterThan(10)
+    expect(g.liveResume(id + 9999)).toBeNull()
+    // the calendar will not move on while the match is unfinished
+    expect(g.advance(5).stop).toBe('match')
+    g.liveFinish()
+    expect(g.liveResume(id)).toBeNull()
+  })
+})
+
 describe('career', () => {
   it('runs 500 days headless, completes the Asian Cup, and survives a save round-trip', () => {
     const g = Game.create(synthRaw(), 42, 'Test')

@@ -115,10 +115,10 @@ export function Federation() {
   const { w, cmd } = useGame()
   const world = w!
   const f = world.fed
-  const Budget = ({ k, label, blurb }: { k: 'scoutBudget' | 'youthInvest'; label: string; blurb: string }) => (
+  const Budget = ({ k, label, blurb, max = 3_000_000, extra }: { k: 'scoutBudget' | 'youthInvest'; label: string; blurb: string; max?: number; extra?: string }) => (
     <div><div className="row" style={{ marginBottom: 8 }}><b>{label}</b><span className="right num">{money(f[k])} a year</span></div>
-      <input type="range" min={0} max={3_000_000} step={100_000} value={f[k]} style={{ ['--v' as string]: `${(f[k] / 3_000_000) * 100}%` }} onChange={(e) => void cmd('setBudget', k, +e.target.value)} />
-      <div className="faint" style={{ fontSize: 12, marginTop: 6 }}>{blurb}</div></div>
+      <input type="range" min={0} max={max} step={100_000} value={f[k]} style={{ ['--v' as string]: `${(f[k] / max) * 100}%` }} onChange={(e) => void cmd('setBudget', k, +e.target.value)} />
+      <div className="faint" style={{ fontSize: 12, marginTop: 6 }}>{blurb}{extra ? ` ${extra}` : ''}</div></div>
   )
   return (
     <div className="page-inner">
@@ -130,7 +130,7 @@ export function Federation() {
       <div className="grid g2" style={{ alignItems: 'start' }}>
         <div className="col" style={{ gap: 18 }}>
           <div className="card col" style={{ gap: 20 }}><h3>Annual programmes</h3>
-            <Budget k="youthInvest" label="Youth development" blurb="Raises the quality of each summer's academy intake across Iranian clubs. The effect builds over years." />
+            <Budget k="youthInvest" label="Youth development" max={10_000_000} blurb="Raises the quality of each summer's academy intake across Iranian clubs. The effect builds over years." extra={`Each doubling of the budget adds about the same again: the typical new prospect's ceiling is about ${Math.round(Math.log2(Math.max(0.2, f.youthInvest / 1_000_000) + 1) * 2.2 * 10) / 10} points above an unfunded academy's at this level.`} />
             <Budget k="scoutBudget" label="Scouting network" blurb="Running costs for the scouting department, on top of scouts' salaries." />
           </div>
           <div className="card"><div className="row" style={{ marginBottom: 8 }}><h3>Europe pathway</h3><b className="right num" style={{ fontSize: 20 }}>{Math.round(f.pathway)}</b></div><Meter v={f.pathway} />

@@ -1,4 +1,12 @@
 {
   "_note": "Hand corrections to a real player's basic facts, matched by name. Only the listed fields are changed. Fields: nat (list of FIFA codes, first is the sporting nationality), born (FIFA code), heightCm, foot (L, R or B).",
-  "Amir Hossein Hosseinzadeh": { "nat": ["IRN"] }
+  "Amir Hossein Hosseinzadeh": {
+    "nat": [
+      "IRN"
+    ]
+  },
+  "Kasra Ghawilu": {
+    "foot": "L",
+    "heightCm": 183
+  }
 }

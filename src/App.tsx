@@ -82,7 +82,7 @@ function NextChip() {
 }
 
 export default function App() {
-  const { w, route, go, playerId, busy, toast, cont } = useGame()
+  const { w, route, go, playerId, busy, toast, cont, liveFixture } = useGame()
   const unread = w ? w.inbox.filter((m) => !m.read).length : 0
   const pendingSquad = w?.camps.find((c) => !c.done && !c.announced && c.from <= w.day && w.teams[c.level].control === 'manual')
   const todayMatch = w?.fixtures.find((f) => !f.played && f.day === w.day && [f.home, f.away].some((r) => r.startsWith('n:IRN:') && w.teams[r.split(':')[2] as Level].control === 'manual'))
@@ -98,7 +98,7 @@ export default function App() {
   if (!w) return <>{small}<Start /></>
   let label = 'Continue'
   let action: () => void = () => void cont()
-  if (route.name === 'match') { label = 'Match in progress'; action = () => {} } else if (pendingSquad) { label = `Name ${LEVEL_NAME[pendingSquad.level]} squad`; action = () => go({ name: 'teams', level: pendingSquad.level, tab: 'callup' }) } else if (todayMatch) { label = 'Go to match'; action = () => go({ name: 'match', fixtureId: todayMatch.id }) }
+  if (route.name === 'match') { label = 'Match in progress'; action = () => {} } else if (pendingSquad) { label = `Name ${LEVEL_NAME[pendingSquad.level]} squad`; action = () => go({ name: 'teams', level: pendingSquad.level, tab: 'callup' }) } else if (liveFixture != null) { label = 'Back to the match'; action = () => go({ name: 'match', fixtureId: liveFixture }) } else if (todayMatch) { label = 'Go to match'; action = () => go({ name: 'match', fixtureId: todayMatch.id }) }
   const group = NAV.find((g) => g.items.some((i) => i.name === route.name)) ?? (route.name === 'match' || route.name === 'report' ? null : NAV[0])
   return (
     <>

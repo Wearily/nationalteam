@@ -53,6 +53,7 @@ export function Teams({ level, tab }: { level: Level; tab?: string }) {
         <div><h2>Iran {level === 'senior' ? '' : LEVEL_NAME[level]}</h2><span className="muted">{coach ? <>Head coach <b style={{ color: 'var(--text)' }}>{coach.name}</b> · prefers {coach.formation} · {coach.abroadBias > 0.25 ? 'favours players based abroad' : coach.abroadBias < -0.25 ? 'favours home-based players' : 'no strong selection bias'}</> : 'No head coach appointed'}</span></div>
         <div className="right col" style={{ alignItems: 'flex-end', gap: 6 }}>
           <div className="seg"><button className={team.control === 'manual' ? 'on' : ''} onClick={() => void cmd('setControl', level, 'manual')}><UserRound size={13} style={{ verticalAlign: -2 }} /> You manage</button><button className={team.control === 'auto' ? 'on' : ''} onClick={() => void cmd('setControl', level, 'auto')}><Sparkles size={13} style={{ verticalAlign: -2 }} /> Coach manages</button></div>
+          {level === 'u23' && team.control === 'auto' && <label className="faint" style={{ fontSize: 12, display: 'flex', gap: 8, alignItems: 'center', marginTop: 6 }}>Over-age players at the Olympics and Asian Games<select className="input" style={{ height: 28 }} value={team.overage ?? 'coach'} onChange={(e) => void cmd('setOverage', level, e.target.value)}><option value="coach">Coach decides</option><option value="none">None: under-23s only</option></select></label>}
           <span className="faint" style={{ fontSize: 11.5 }}>{team.control === 'manual' ? 'You pick squads, tactics and manage matches.' : 'The coach picks squads and tactics; matches are simulated.'}</span>
         </div>
       </div>
@@ -63,7 +64,7 @@ export function Teams({ level, tab }: { level: Level; tab?: string }) {
             <div className="card-head"><h3>Current squad</h3><span className="faint">{squad.length} players · {squad.filter((p) => isAbroad(world, p)).length} based abroad</span></div>
             <table className="t"><thead><tr><th>Player</th><th>Pos</th><th className="c">Age</th><th className="c">Ovr</th><th className="c">Pot</th><th>Club</th><th className="c">Caps</th><th className="c">Goals</th><th className="c">Club form</th><th className="c">Intl rating</th><th className="c">Cond</th><th className="c">Morale</th></tr></thead><tbody>
               {[...squad].sort((a, b) => lines.indexOf(posLine(a.pos[0])) - lines.indexOf(posLine(b.pos[0])) || b.ovr - a.ovr).map((p) => (
-                <tr key={p.id}><td><PlayerLink p={p} sub={p.injury ? <span style={{ color: '#fca5a5' }}>{p.injury.name} until {fmtDay(p.injury.until, false)}</span> : undefined} /></td><td><PosTag pos={p.pos[0]} /></td><td className="c num">{ageOf(world, p)}</td><td className="c"><Ovr p={p} /></td><td className="c"><Ovr p={p} pot /></td>
+                <tr key={p.id}><td><PlayerLink p={p} sub={p.injury ? <span style={{ color: '#fca5a5' }}>{p.injury.name} until {fmtDay(p.injury.until, false)}</span> : level !== 'senior' && !ageEligible(p, level, world.day) ? <span style={{ color: '#93c5fd' }}>Over-age</span> : undefined} /></td><td><PosTag pos={p.pos[0]} /></td><td className="c num">{ageOf(world, p)}</td><td className="c"><Ovr p={p} /></td><td className="c"><Ovr p={p} pot /></td>
                   <td><span className="row" style={{ gap: 8 }}>{clubOf(world, p) ? <><Flag code={clubOf(world, p)!.country} />{clubOf(world, p)!.name}</> : <span className="faint">Free agent</span>}</span></td>
                   <td className="c num">{level === 'senior' ? p.caps : p.youthCaps[level] ?? 0}</td><td className="c num">{level === 'senior' ? p.goals : p.intl.goals}</td><td className="c"><FormDots form={p.form} /></td><td className="c"><Rating v={p.intl.apps ? p.intl.ratingSum / p.intl.apps : null} /></td><td className="c num">{Math.round(p.cond)}%</td><td className="c num">{Math.round(p.morale)}</td></tr>
               ))}
@@ -84,7 +85,7 @@ export function Teams({ level, tab }: { level: Level; tab?: string }) {
                 {lines.map((l) => {
                   const ps = picked.filter((p) => posLine(p.pos[0]) === l).sort((a, b) => b.ovr - a.ovr)
                   return <div key={l}><div className="row eyebrow" style={{ marginBottom: 5 }}>{l}<span className="right">{ps.length}</span></div>
-                    {ps.map((p) => <div key={p.id} className="row" style={{ padding: '3px 0', cursor: 'pointer' }} onClick={() => toggle(p)}><PosTag pos={p.pos[0]} /><span className="truncate grow">{p.name}</span><Ovr p={p} /></div>)}</div>
+                    {ps.map((p) => <div key={p.id} className="row" style={{ padding: '3px 0', cursor: 'pointer' }} onClick={() => toggle(p)}><PosTag pos={p.pos[0]} /><span className="truncate grow">{p.name}{level !== 'senior' && !ageEligible(p, level, world.day) && <span className="pill blue" style={{ marginLeft: 6, height: 17 }}>OA</span>}</span><Ovr p={p} /></div>)}</div>
                 })}
               </div>
               <button className="btn primary go" disabled={pick.size < 18 || pick.size > camp.size} onClick={() => void announce()}>Announce squad</button>

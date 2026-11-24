@@ -7,7 +7,7 @@ import type { World } from '../sim/world/state'
 import type { Pos } from '../sim/world/types'
 
 let game: Game | null = null
-const CMDS = new Set(['announceSquad', 'assignScout', 'hireCoach', 'approach', 'setControl', 'setTactic', 'setBudget', 'markRead', 'markAllRead', 'lastSquadFor', 'askReturn', 'suggestSquad', 'arrangeFriendly', 'bookFriendly', 'cancelFriendly'])
+const CMDS = new Set(['announceSquad', 'assignScout', 'hireCoach', 'approach', 'setControl', 'setOverage', 'setTactic', 'setBudget', 'markRead', 'markAllRead', 'lastSquadFor', 'askReturn', 'suggestSquad', 'arrangeFriendly', 'bookFriendly', 'cancelFriendly'])
 
 const api = {
   newGame(raw: RawData, seed: number, name: string, extra?: RawExtra | null): World {
@@ -33,6 +33,7 @@ const api = {
     return { res, w: wantWorld ? game!.w : null }
   },
   liveStart(fixtureId: number) { return game!.liveStart(fixtureId) },
+  liveResume(fixtureId: number) { return game!.liveResume(fixtureId) },
   liveStep(n: number) { return game!.liveStep(n) },
   liveCoach(on: boolean) { return game!.liveCoach(on) },
   liveSub(outId: number, inId: number) { return game!.liveSub(outId, inId) },

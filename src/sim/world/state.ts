@@ -27,6 +27,8 @@ export interface IranTeam {
   shortlist: number[]
   /** The most recently announced squad, for "same again" call-ups. */
   lastSquad?: number[]
+  /** When a tournament allows over-age players and the coach names the squad: 'coach' (default) lets him pick them, 'none' keeps it to the age group. */
+  overage?: 'coach' | 'none'
 }
 
 export interface Federation {

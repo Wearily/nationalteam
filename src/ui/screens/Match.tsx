@@ -284,14 +284,36 @@ export function MatchCentre({ fixtureId }: { fixtureId: number }) {
     nums.current = [...c.snap.on[0], ...c.snap.on[1]].map((id) => (id >= 0 ? String(world.players[id]?.num ?? (id % 30) + 1) : ''))
   }, [world])
 
+  const setLive = useGame((s) => s.setLive)
   const kickOff = async () => {
     await sim.cmd('setTactic', [level, tactic], false)
     const c = await sim.liveStart(fixtureId)
     if (typeof c === 'string') return notify(c)
     absorb(c)
     if (coachOn) setSnap(await sim.liveCoach(true))
+    setLive(fixtureId)
     setPhase('live')
   }
+  // coming back to a match that was left half-played: pick it up where it was, paused
+  useEffect(() => {
+    let off = false
+    void sim.liveResume(fixtureId).then((r) => {
+      if (off || !r) return
+      frames.current = []
+      absorb(r.chunk)
+      const last = r.chunk.frames[r.chunk.frames.length - 1]
+      clock.current = last ? last.t : 0
+      st.current.shown = r.chunk.events.length
+      setShown(r.chunk.events.length)
+      setCoachOn(r.coachOn)
+      setTactic(r.chunk.snap.tactics[side])
+      setPlaying(false)
+      setLive(fixtureId)
+      setPhase(r.chunk.snap.done ? 'done' : 'live')
+    })
+    return () => { off = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fixtureId])
 
   useEffect(() => {
     if (phase !== 'live') return
@@ -326,6 +348,7 @@ export function MatchCentre({ fixtureId }: { fixtureId: number }) {
 
   const finish = async () => {
     const { report, w: nw } = await sim.liveFinish()
+    setLive(null)
     setWorld(nw)
     go(report >= 0 ? { name: 'report', id: report } : { name: 'home' })
   }

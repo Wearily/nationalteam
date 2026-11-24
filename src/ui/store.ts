@@ -75,6 +75,9 @@ interface State {
   go: (r: Route) => void
   openPlayer: (id: number | null) => void
   setWorld: (w: World) => void
+  /** The fixture being played on screen, if any: leaving the match screen must not lose it. */
+  liveFixture: number | null
+  setLive: (id: number | null) => void
   notify: (t: string | null) => void
   newGame: (name: string) => Promise<void>
   resume: (slot?: Slot, from?: World) => Promise<boolean>
@@ -97,6 +100,8 @@ export const useGame = create<State>((set, get) => ({
     set({ drafts })
     try { localStorage.setItem('tm-drafts', JSON.stringify(drafts)) } catch { /* private mode: the draft still lives for this session */ }
   },
+  liveFixture: null,
+  setLive: (liveFixture) => set({ liveFixture }),
   go: (route) => set({ route, playerId: null }),
   openPlayer: (playerId) => set({ playerId }),
   setWorld: (w) => { set({ w }); saveWorld(w).catch((e) => get().notify(`Could not save: ${(e as Error).message}. Export the career from Federation to keep it safe.`)) },

@@ -1,6 +1,7 @@
 import { fmtDay, toDay, ymd, type Day } from './core/date'
 import { Rng, clamp } from './core/rng'
 import { A, fitToOverall, overallAt, posLine } from './ratings/attributes'
+import { ageOn } from './core/date'
 import { mergeExtra, nameKey, type RawData, type RawExtra } from './data/raw'
 import { campLift, developAll, matchLift, revalue, reviewPotential, seasonRollover } from './career/develop'
 import { seasonYearFor, simClubFixture, startLeagueSeason } from './clubs/season'
@@ -175,10 +176,19 @@ export class Game {
     }
     const ids = pickSquad(this.w, this.idx, this.rng, 'IRN', level, size, this.w.day, coach?.abroadBias ?? 0, taken)
     // tournaments that allow over-age players: the coach brings the best available seniors where they improve the squad
-    const over = this.overageFor(level)
+    const over = this.w.teams[level].overage === 'none' ? 0 : this.overageFor(level)
     if (over) {
       const w = this.w
-      const olds = eligible(w, this.idx, 'IRN', 'senior', w.day).filter((p) => !ageEligible(p, level, w.day) && !taken.has(p.id) && !p.injury).sort((a, b) => selectionScore(w, b) - selectionScore(w, a))
+      // the senior side's regulars are not raided when the senior team has matches during the camp
+      const camp = this.activeCamp(level)
+      const seniorBusy = !!camp && w.fixtures.some((f) => !f.played && (f.home === 'n:IRN:senior' || f.away === 'n:IRN:senior') && f.day >= camp.from && f.day <= camp.to + 2)
+      const regulars = new Set([...(w.teams.senior.lastSquad ?? []), ...w.teams.senior.squad])
+      // experienced head, not the oldest: players up to 28 are preferred, and anyone from the senior squad is a last resort
+      const wanted = (p: Player) => selectionScore(w, p) - Math.max(0, ageOn(p.dob, w.day) - 28) * 0.8 - (regulars.has(p.id) ? 2.5 : 0)
+      // the Asian Games are not in a FIFA window, so clubs in stronger leagues abroad do not release players for them
+      const games = !!camp && w.comps[camp.compId]?.key.startsWith('asian-games')
+      const released = (p: Player) => !games || p.clubId == null || w.leagues[w.clubs[p.clubId].leagueId].country === 'IRN' || w.leagues[w.clubs[p.clubId].leagueId].strength < 60
+      const olds = eligible(w, this.idx, 'IRN', 'senior', w.day).filter((p) => !ageEligible(p, level, w.day) && !taken.has(p.id) && !p.injury && !(seniorBusy && regulars.has(p.id)) && released(p)).sort((a, b) => wanted(b) - wanted(a))
       let n = 0
       for (const o of olds) {
         if (n >= over) break
@@ -191,6 +201,7 @@ export class Game {
     }
     return ids
   }
+  setOverage(level: Level, mode: 'coach' | 'none') { this.w.teams[level].overage = mode }
   /** Over-age players allowed in the squad now being named for this team (0 for ordinary camps). */
   overageFor(level: Level): number {
     const camp = this.activeCamp(level)
@@ -314,6 +325,11 @@ export class Game {
     const debut = ids.map((id) => w.players[id]).filter((p) => p.caps === 0)
     const who = byCoach && team.coachId != null ? w.staff[team.coachId].name : 'You'
     let body = `${who} named ${ids.length} players for the ${camp.label.toLowerCase()}.`
+    const allowed = w.comps[camp.compId]?.overage ?? 0
+    if (allowed) {
+      const oa = ids.map((id) => w.players[id]).filter((p) => !ageEligible(p, level, w.day))
+      body += `\n\nThe ${w.comps[camp.compId].short} allows up to ${allowed} players over the age limit. ${oa.length ? `Over-age in this squad: ${oa.map((p) => `${p.name} (${ageOn(p.dob, w.day)})`).join(', ')}.` : 'None are included in this squad.'}`
+    }
     if (level === 'senior' && debut.length) body += `\n\nUncapped: ${debut.slice(0, 6).map((p) => p.name).join(', ')}.`
     if (snubbed.length) body += `\n\nLeft out and unhappy about it: ${snubbed.slice(0, 4).map((p) => p.name).join(', ')}.`
     this.msg('squad', `${LEVEL_NAME[level]} squad announced`, body, false, `team:${level}`)
@@ -494,7 +510,7 @@ export class Game {
   }
   setControl(level: Level, control: 'manual' | 'auto') { this.w.teams[level].control = control }
   setTactic(level: Level, tac: Tactic) { this.w.teams[level].tactic = tac }
-  setBudget(key: 'scoutBudget' | 'youthInvest', v: number) { this.w.fed[key] = clamp(Math.round(v), 0, 5_000_000) }
+  setBudget(key: 'scoutBudget' | 'youthInvest', v: number) { this.w.fed[key] = clamp(Math.round(v), 0, key === 'youthInvest' ? 10_000_000 : 5_000_000) }
   markAllRead() { for (const m of this.w.inbox) m.read = true }
   markRead(id: number) { const m = this.w.inbox.find((x) => x.id === id); if (m) m.read = true }
 
@@ -730,6 +746,7 @@ export class Game {
 
   /** Simulate a fixture that needs no user involvement. */
   private autoPlay(f: Fixture, away: Set<number>) {
+    if (this.live?.fixture.id === f.id) return // being played on screen
     const comp = this.w.comps[f.compId]
     if (comp.scope === 'club') {
       simClubFixture(this.w, this.idx, f, this.rng, away)
@@ -773,6 +790,8 @@ export class Game {
   liveStart(fixtureId: number): LiveChunk | string {
     const f = this.w.fixtures.find((x) => x.id === fixtureId)
     if (!f || f.played) return 'That match is not available.'
+    // a match already under way is never restarted: it is picked up again with liveResume
+    if (this.live && this.live.fixture.id === fixtureId && !this.live.fixture.played) return 'That match is already in progress.'
     const side = f.home.startsWith('n:IRN:') ? 0 : 1
     const level = (parseRef(side === 0 ? f.home : f.away) as { level: Level }).level
     const team = this.w.teams[level]
@@ -781,6 +800,16 @@ export class Game {
     const sim = this.makeSim(f, true, manual ? (side as 0 | 1) : -1)
     this.live = { sim, fixture: f, side: side as 0 | 1, sentFrames: 0, sentEvents: 0, sentShots: 0 }
     return this.liveStep(1)
+  }
+  /** The match in progress for this fixture, everything played so far, so the screen can pick it up where it was left. */
+  liveResume(fixtureId: number): { chunk: LiveChunk; coachOn: boolean } | null {
+    const L = this.live
+    if (!L || L.fixture.id !== fixtureId || L.fixture.played) return null
+    const chunk: LiveChunk = { frames: L.sim.frames.slice(), events: L.sim.events.slice(), shots: L.sim.shots.slice(), snap: L.sim.snapshot(), frameBase: 0 }
+    L.sentFrames = L.sim.frames.length
+    L.sentEvents = L.sim.events.length
+    L.sentShots = L.sim.shots.length
+    return { chunk, coachOn: !!L.sim.teams[L.side].ai }
   }
   liveStep(n: number): LiveChunk {
     const L = this.live!
@@ -829,6 +858,11 @@ export class Game {
   }
   blocker(): AdvanceResult | null {
     const w = this.w
+    // a match left half-played comes first: the calendar cannot move past it
+    if (this.live && !this.live.fixture.played) {
+      const ref = this.live.side === 0 ? this.live.fixture.home : this.live.fixture.away
+      return { stop: 'match', level: ref.split(':')[2] as Level, fixtureId: this.live.fixture.id, days: 0 }
+    }
     for (const c of this.dueCamps()) {
       // an older coach-run side due today names its squad before the user is asked about a younger one
       if (w.teams[c.level].control !== 'manual') { this.autoAnnounce(c); continue }

@@ -204,7 +204,7 @@ export function seasonRollover(w: World, rng: Rng, day: Day): string[] {
     if (p.clubId == null && !p.real && age > 24 && p.nat[0] !== 'IRN') p.retired = true
   }
   // academy intake: better youth investment and a stronger pathway culture raise the ceiling
-  const invest = clamp(w.fed.youthInvest / 1_000_000, 0.2, 3)
+  const invest = clamp(w.fed.youthInvest / 1_000_000, 0.2, 10)
   for (const c of w.clubs) {
     if (!c.full) continue
     const lg = w.leagues[c.leagueId]
